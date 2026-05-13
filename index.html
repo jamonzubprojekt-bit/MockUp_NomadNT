@@ -387,6 +387,7 @@ textarea.form-control { resize: vertical; min-height: 70px; }
             <th class="center">VR Typ</th>
             <th>Termín / Odpočet</th>
             <th>Moduly ① ② ③ ④ ⑤ ⑥ · S · VR</th>
+            <th class="center">RZSV</th>
             <th class="center">Detail</th>
           </tr>
         </thead>
@@ -725,7 +726,7 @@ function formatCountdown(dateStr) {
 }
 
 function getNearestScheduled(rec) {
-  const mods=[1,2,3,4,5,6,7]; if(rec.vrType==='MSO') mods.push(8);
+  const mods=[1,2,3,4,5,6,7]; if(rec.vrType==='VSO') mods.push(8);
   let nearest = null;
   mods.forEach(m => {
     const st = getModState(rec.ropId,m);
@@ -745,7 +746,7 @@ function renderModLegend() {
   const counts={};
   for(let m=1;m<=8;m++) counts[m]={pending:0,sched:0,vada:0,hotovo:0};
   records.forEach(rec => {
-    const mods=[1,2,3,4,5,6,7]; if(rec.vrType==='MSO') mods.push(8);
+    const mods=[1,2,3,4,5,6,7]; if(rec.vrType==='VSO') mods.push(8);
     mods.forEach(m => {
       const st=getModState(rec.ropId,m);
       if(st.status==='hotovo') counts[m].hotovo++;
@@ -780,8 +781,26 @@ function isModLocked(rec, m) {
   return getModState(rec.ropId,SEQ[idx-1]).status!=='hotovo';
 }
 function isLitUp(rec) {
-  const mods=[1,2,3,4,5,6,7]; if(rec.vrType==='MSO') mods.push(8);
+  const mods=[1,2,3,4,5,6,7]; if(rec.vrType==='VSO') mods.push(8);
   return mods.every(m=>getModState(rec.ropId,m).status==='hotovo');
+}
+function canRzsv(rec) {
+  const mods=[1,2,3,4,5,6,7]; if(rec.vrType==='VSO') mods.push(8);
+  return mods.every(m=>getModState(rec.ropId,m).status==='hotovo');
+}
+function rzsvCell(rec) {
+  const enabled=canRzsv(rec), active=moduleState[rec.ropId]?._rzsv==='ano';
+  if(active) return `<button class="btn success" style="font-size:11px;padding:3px 10px" onclick="toggleRzsv('${rec.ropId}')">✓ ANO</button>`;
+  if(enabled) return `<button class="btn" style="font-size:11px;padding:3px 10px" onclick="toggleRzsv('${rec.ropId}')">NE</button>`;
+  return `<span class="badge badge-gray" style="opacity:0.4;cursor:default">NE</span>`;
+}
+function toggleRzsv(ropId) {
+  const rec=records.find(r=>r.ropId===ropId); if(!rec) return;
+  const active=moduleState[ropId]?._rzsv==='ano';
+  if(!active && !canRzsv(rec)) return;
+  if(!moduleState[ropId]) moduleState[ropId]={};
+  moduleState[ropId]._rzsv=active?'ne':'ano';
+  saveState(); renderTable(); updateStats();
 }
 
 function getFilteredRecords() {
@@ -829,7 +848,7 @@ function getSortedRecords(list) {
 
 // ── TABLE RENDERING ────────────────────────────────────
 function renderModSquares(rec) {
-  const indep=[7]; if(rec.vrType==='MSO') indep.push(8);
+  const indep=[7]; if(rec.vrType==='VSO') indep.push(8);
   let h='<div class="modules-cell">';
   SEQ.forEach(m=>{
     const st=getModState(rec.ropId,m), locked=isModLocked(rec,m);
@@ -876,10 +895,11 @@ function renderTable() {
       <td class="center"><span class="badge ${vrB}">${rec.vrType||'—'}</span></td>
       <td style="min-width:140px">${terminCell}</td>
       <td>${renderModSquares(rec)}${litUp?'<span class="badge badge-green" style="margin-left:6px;font-size:9px">✓ LIT</span>':''}</td>
+      <td class="center">${rzsvCell(rec)}</td>
       <td class="center"><button class="icon-btn" onclick="openRecModal('${rec.ropId}')">👁</button></td>
     </tr>`;
   });
-  document.getElementById('table-body').innerHTML=h||'<tr><td colspan="12" style="text-align:center;padding:40px;color:var(--text-muted)">Žádné záznamy</td></tr>';
+  document.getElementById('table-body').innerHTML=h||'<tr><td colspan="13" style="text-align:center;padding:40px;color:var(--text-muted)">Žádné záznamy</td></tr>';
 }
 
 // ── STATS ──────────────────────────────────────────────
@@ -891,7 +911,7 @@ function updateStats() {
   document.getElementById('s-podepsano').textContent=records.filter(r=>r.statusAcq==='Podepsáno').length;
   document.getElementById('s-mso').textContent=records.filter(r=>r.vrType==='MSO').length;
   document.getElementById('s-vso').textContent=records.filter(r=>r.vrType==='VSO').length;
-  document.getElementById('s-done').textContent=records.filter(r=>isLitUp(r)).length;
+  document.getElementById('s-done').textContent=records.filter(r=>moduleState[r.ropId]?._rzsv==='ano').length;
   document.getElementById('s-today').textContent=records.filter(r=>Object.values(moduleState[r.ropId]||{}).some(m=>m.date&&m.date.startsWith(today))).length;
 }
 
@@ -939,7 +959,7 @@ function saveModStatus() {
 function openRecModal(ropId) {
   const rec=records.find(r=>r.ropId===ropId); if(!rec) return;
   document.getElementById('rec-modal-title').textContent='Detail — Bod zájmu #'+rec.bodZajmu;
-  const mods=[1,2,3,4,5,6,7]; if(rec.vrType==='MSO') mods.push(8);
+  const mods=[1,2,3,4,5,6,7]; if(rec.vrType==='VSO') mods.push(8);
   const litUp=isLitUp(rec);
   const modRows=mods.map(m=>{
     const st=getModState(ropId,m);
