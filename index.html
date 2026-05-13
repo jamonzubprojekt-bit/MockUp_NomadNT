@@ -1,0 +1,1149 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NomadNT — Dashboard Operátora · DUTEP11 v2</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<style>
+:root {
+  --bg: #0d1117; --surface: #161b22; --card: #21262d; --border: #30363d;
+  --text: #e6edf3; --text-muted: #8b949e; --blue: #0056b3; --blue-light: #1f6feb;
+  --green: #28a745; --green-bg: #0d2818; --red: #dc3545; --red-bg: #2d1018;
+  --yellow: #e3a008; --yellow-bg: #2d2000; --orange: #ff8c00; --orange-bg: #3d1f00;
+  --gray: #6c757d; --gold: #d4a017; --purple: #6f42c1; --radius: 6px;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; font-size: 13px; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+
+/* ── LOGIN SCREEN ── */
+#login-screen {
+  position: fixed; inset: 0; background: var(--bg); z-index: 9999;
+  display: flex; align-items: center; justify-content: center;
+}
+#login-screen.hidden { display: none; }
+.login-box {
+  background: var(--card); border: 1px solid var(--border); border-radius: 12px;
+  padding: 40px 36px; width: 360px; max-width: 95vw;
+  box-shadow: 0 24px 64px rgba(0,0,0,0.6);
+}
+.login-logo {
+  text-align: center; margin-bottom: 28px;
+}
+.login-logo .logo-mark {
+  font-size: 40px; color: var(--blue-light); display: block; margin-bottom: 6px;
+}
+.login-logo .logo-name {
+  font-size: 22px; font-weight: 700; color: var(--blue-light); letter-spacing: 1.5px;
+}
+.login-logo .logo-sub {
+  font-size: 11px; color: var(--text-muted); margin-top: 4px;
+  text-transform: uppercase; letter-spacing: 0.8px;
+}
+.login-field { margin-bottom: 16px; }
+.login-field label {
+  display: block; font-size: 11px; color: var(--text-muted);
+  margin-bottom: 6px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;
+}
+.login-field input {
+  width: 100%; background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); color: var(--text); padding: 10px 14px; font-size: 13px;
+  transition: border-color 0.15s;
+}
+.login-field input:focus { outline: none; border-color: var(--blue-light); }
+.login-field input.input-error { border-color: var(--red); }
+#login-error {
+  background: var(--red-bg); border: 1px solid var(--red); border-radius: var(--radius);
+  color: var(--red); font-size: 12px; padding: 10px 14px; margin-bottom: 16px;
+  display: none;
+}
+#login-error.visible { display: block; }
+#login-btn {
+  width: 100%; padding: 11px; background: var(--blue-light); border: none;
+  border-radius: var(--radius); color: #fff; font-size: 14px; font-weight: 600;
+  cursor: pointer; transition: background 0.15s; letter-spacing: 0.3px;
+}
+#login-btn:hover:not(:disabled) { background: #2b7de9; }
+#login-btn:disabled { opacity: 0.55; cursor: not-allowed; }
+#login-countdown {
+  text-align: center; font-size: 11px; color: var(--orange);
+  margin-top: 10px; min-height: 16px;
+}
+.login-footer {
+  text-align: center; margin-top: 24px; font-size: 10px; color: var(--text-muted);
+  border-top: 1px solid var(--border); padding-top: 16px;
+}
+
+/* ── TOP BAR ── */
+#topbar { display: flex; align-items: center; gap: 16px; padding: 0 16px; background: var(--surface); border-bottom: 1px solid var(--border); height: 52px; flex-shrink: 0; }
+#topbar .logo { font-size: 18px; font-weight: 700; color: var(--blue-light); letter-spacing: 1px; }
+#topbar .project-badge { background: var(--card); border: 1px solid var(--border); border-radius: 4px; padding: 3px 10px; font-size: 11px; color: var(--text-muted); font-weight: 600; }
+#topbar .clock { margin-left: auto; font-size: 12px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+#logout-btn {
+  padding: 4px 12px; border-radius: var(--radius); border: 1px solid var(--border);
+  background: transparent; color: var(--text-muted); cursor: pointer; font-size: 11px;
+  transition: all 0.15s; white-space: nowrap;
+}
+#logout-btn:hover { border-color: var(--red); color: var(--red); }
+
+/* STATS BAR */
+#statsbar { display: flex; gap: 12px; padding: 8px 16px; background: var(--surface); border-bottom: 1px solid var(--border); flex-shrink: 0; flex-wrap: wrap; }
+.stat-chip { display: flex; align-items: center; gap: 6px; background: var(--card); border: 1px solid var(--border); border-radius: 20px; padding: 4px 12px; font-size: 12px; }
+.stat-chip .dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.stat-chip .val { font-weight: 700; font-size: 14px; }
+
+/* MODULE LEGEND */
+#modlegend { display: none; gap: 8px; padding: 7px 16px; background: #0a0e14; border-bottom: 1px solid var(--border); flex-shrink: 0; flex-wrap: wrap; align-items: center; }
+.mod-legend-chip { display: flex; align-items: center; gap: 5px; background: var(--card); border: 1px solid var(--border); border-radius: 6px; padding: 4px 10px; font-size: 11px; white-space: nowrap; }
+.mod-legend-name { color: var(--text-muted); font-weight: 600; margin-right: 3px; font-size: 10px; }
+.lc-sep { color: var(--border); margin: 0 1px; }
+.lc-pending { color: #e6edf3; font-weight: 700; }
+.lc-sched { color: var(--orange); font-weight: 700; }
+.lc-vada { color: var(--red); font-weight: 700; }
+.lc-hotovo { color: var(--green); font-weight: 700; }
+.legend-label { font-size: 10px; color: var(--text-muted); font-weight: 600; letter-spacing: 0.5px; text-transform: uppercase; }
+
+/* CONTROLS */
+#controls { display: flex; align-items: center; gap: 10px; padding: 7px 16px; background: var(--card); border-bottom: 1px solid var(--border); flex-shrink: 0; flex-wrap: wrap; }
+.btn { padding: 5px 14px; border-radius: var(--radius); border: 1px solid var(--border); background: var(--card); color: var(--text); cursor: pointer; font-size: 12px; transition: all 0.15s; font-weight: 500; }
+.btn:hover { border-color: var(--blue-light); color: var(--blue-light); }
+.btn.active { background: var(--blue); border-color: var(--blue); color: #fff; }
+.btn.success { border-color: var(--green); color: var(--green); }
+.btn.success:hover, .btn.success.active { background: var(--green); color: #fff; }
+#search-input { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); color: var(--text); padding: 5px 12px; font-size: 12px; width: 200px; }
+#search-input:focus { outline: none; border-color: var(--blue-light); }
+.file-label { display: flex; align-items: center; gap: 6px; padding: 5px 14px; border-radius: var(--radius); border: 1px dashed var(--blue-light); background: transparent; color: var(--blue-light); cursor: pointer; font-size: 12px; font-weight: 500; }
+.file-label:hover { background: rgba(31,111,235,0.1); }
+#csv-input { display: none; }
+.separator { width: 1px; height: 24px; background: var(--border); margin: 0 2px; }
+
+/* FILTER BAR */
+#filterbar { display: flex; align-items: center; gap: 8px; padding: 6px 16px; background: var(--surface); border-bottom: 2px solid var(--blue); flex-shrink: 0; flex-wrap: wrap; }
+.filter-select { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); color: var(--text); padding: 4px 8px; font-size: 11px; cursor: pointer; max-width: 160px; }
+.filter-select:focus { outline: none; border-color: var(--blue-light); }
+.filter-label { font-size: 10px; color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+
+/* TABS */
+#tabs { display: flex; background: var(--surface); border-bottom: 1px solid var(--border); flex-shrink: 0; }
+.tab { padding: 8px 20px; cursor: pointer; font-size: 12px; font-weight: 500; color: var(--text-muted); border-bottom: 2px solid transparent; transition: all 0.15s; }
+.tab:hover { color: var(--text); }
+.tab.active { color: var(--blue-light); border-bottom-color: var(--blue-light); }
+
+/* CONTENT */
+#content { flex: 1; overflow: hidden; display: flex; flex-direction: column; }
+.tab-panel { display: none; flex: 1; overflow: hidden; flex-direction: column; }
+.tab-panel.active { display: flex; }
+
+/* TABLE */
+#table-wrap { flex: 1; overflow: auto; }
+table { width: 100%; border-collapse: collapse; min-width: 1700px; }
+thead tr { background: var(--surface); position: sticky; top: 0; z-index: 10; }
+thead th { padding: 8px 10px; text-align: left; font-size: 11px; font-weight: 600; color: var(--text-muted); border-bottom: 2px solid var(--border); white-space: nowrap; text-transform: uppercase; letter-spacing: 0.5px; }
+thead th.center { text-align: center; }
+tbody tr { border-bottom: 1px solid var(--border); transition: background 0.1s; }
+tbody tr:hover { background: rgba(255,255,255,0.03); }
+tbody tr.highlight-today { background: rgba(255,140,0,0.05); }
+tbody tr.row-nesouhlas { opacity: 0.5; }
+td { padding: 6px 10px; vertical-align: middle; }
+td.center { text-align: center; }
+
+/* EMPTY STATE */
+#empty-state { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; color: var(--text-muted); }
+#empty-state .icon { font-size: 48px; }
+#empty-state h3 { font-size: 18px; color: var(--text); }
+#empty-state p { font-size: 13px; max-width: 400px; text-align: center; line-height: 1.6; }
+#empty-state .upload-big { padding: 12px 28px; border-radius: var(--radius); border: 2px dashed var(--blue-light); color: var(--blue-light); cursor: pointer; font-size: 14px; font-weight: 600; background: transparent; }
+#empty-state .upload-big:hover { background: rgba(31,111,235,0.1); }
+
+/* MODULE SQUARES */
+.modules-cell { display: flex; gap: 4px; align-items: center; padding: 4px 0; }
+.mod-sq { width: 26px; height: 26px; border-radius: 4px; cursor: pointer; border: 2px solid; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 700; transition: all 0.15s; position: relative; flex-shrink: 0; }
+.mod-sq:hover { transform: scale(1.15); z-index: 5; }
+.mod-sq.pending { background: #1e2530; border-color: var(--border); color: var(--text-muted); }
+.mod-sq.scheduled { background: var(--orange-bg); border-color: var(--orange); color: var(--orange); }
+.mod-sq.hotovo { background: var(--green-bg); border-color: var(--green); color: var(--green); }
+.mod-sq.vada { background: var(--red-bg); border-color: var(--red); color: var(--red); }
+.mod-sq.locked { cursor: not-allowed; opacity: 0.35; }
+.mod-sq.locked:hover { transform: none; }
+.mod-divider { width: 1px; height: 20px; background: var(--border); margin: 0 2px; }
+
+/* BADGES */
+.badge { display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: 10px; font-weight: 700; white-space: nowrap; }
+.badge-green { background: var(--green-bg); color: var(--green); border: 1px solid var(--green); }
+.badge-red { background: var(--red-bg); color: var(--red); border: 1px solid var(--red); }
+.badge-yellow { background: var(--yellow-bg); color: var(--yellow); border: 1px solid var(--yellow); }
+.badge-blue { background: rgba(0,86,179,0.2); color: #58a6ff; border: 1px solid #1f6feb; }
+.badge-purple { background: rgba(111,66,193,0.2); color: #bc8cff; border: 1px solid #6f42c1; }
+.badge-gray { background: rgba(108,117,125,0.2); color: var(--text-muted); border: 1px solid var(--border); }
+.badge-orange { background: var(--orange-bg); color: var(--orange); border: 1px solid var(--orange); }
+
+.addr-line1 { font-weight: 500; color: var(--text); }
+.addr-line2 { font-size: 11px; color: var(--text-muted); margin-top: 1px; }
+
+/* COUNTDOWN COLORS */
+.cd-past { color: var(--red); font-size: 11px; }
+.cd-today { color: var(--orange); font-weight: 700; font-size: 11px; }
+.cd-near { color: var(--yellow); font-size: 11px; }
+.cd-future { color: var(--text-muted); font-size: 11px; }
+
+/* MODALS */
+.modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.75); backdrop-filter: blur(4px); z-index: 1000; align-items: center; justify-content: center; }
+.modal-overlay.open { display: flex; }
+.modal { background: var(--card); border: 1px solid var(--border); border-radius: 10px; width: 480px; max-width: 95vw; max-height: 90vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(0,0,0,0.5); }
+.modal-wide { width: 640px; }
+.modal-header { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; border-bottom: 1px solid var(--border); }
+.modal-header h3 { font-size: 15px; font-weight: 600; }
+.modal-close { background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 20px; line-height: 1; padding: 0 4px; }
+.modal-close:hover { color: var(--text); }
+.modal-body { padding: 20px; }
+.modal-footer { padding: 14px 20px; border-top: 1px solid var(--border); display: flex; gap: 8px; justify-content: flex-end; }
+
+.form-group { margin-bottom: 16px; }
+.form-group label { display: block; font-size: 11px; color: var(--text-muted); margin-bottom: 6px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+.form-control { width: 100%; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); color: var(--text); padding: 8px 12px; font-size: 13px; }
+.form-control:focus { outline: none; border-color: var(--blue-light); }
+textarea.form-control { resize: vertical; min-height: 70px; }
+
+.status-btn-group { display: flex; gap: 8px; flex-wrap: wrap; }
+.status-btn { flex: 1; padding: 10px; border-radius: var(--radius); border: 2px solid; cursor: pointer; font-size: 13px; font-weight: 600; transition: all 0.15s; text-align: center; background: transparent; min-width: 100px; }
+.status-btn.s-hotovo { border-color: var(--green); color: var(--green); }
+.status-btn.s-hotovo:hover { background: var(--green); color: #fff; }
+.status-btn.s-vada { border-color: var(--red); color: var(--red); }
+.status-btn.s-vada:hover { background: var(--red); color: #fff; }
+.status-btn.s-reset { border-color: var(--border); color: var(--text-muted); }
+.status-btn.s-reset:hover { background: var(--border); color: var(--text); }
+
+.mod-detail-header { display: flex; align-items: center; gap: 12px; padding: 12px 16px; background: var(--surface); border-radius: var(--radius); margin-bottom: 16px; }
+.mod-detail-icon { width: 40px; height: 40px; border-radius: var(--radius); display: flex; align-items: center; justify-content: center; font-size: 18px; flex-shrink: 0; }
+.mod-detail-name { font-size: 14px; font-weight: 600; }
+.mod-detail-sub { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+
+.info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px; }
+.info-item { background: var(--surface); border-radius: var(--radius); padding: 10px 12px; }
+.info-item .lbl { font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
+.info-item .val { font-size: 13px; font-weight: 500; }
+
+.icon-btn { background: none; border: none; color: var(--text-muted); cursor: pointer; padding: 4px 6px; border-radius: 4px; font-size: 14px; transition: all 0.15s; }
+.icon-btn:hover { color: var(--blue-light); background: rgba(31,111,235,0.1); }
+
+.detail-section { margin-bottom: 16px; }
+.detail-section h4 { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; padding-bottom: 6px; border-bottom: 1px solid var(--border); }
+.detail-row { display: flex; justify-content: space-between; padding: 4px 0; font-size: 12px; }
+.detail-row .dk { color: var(--text-muted); }
+.detail-row .dv { font-weight: 500; text-align: right; max-width: 60%; }
+
+.doc-placeholder { border: 2px dashed var(--border); border-radius: var(--radius); padding: 24px; text-align: center; color: var(--text-muted); margin-top: 12px; cursor: pointer; transition: all 0.15s; }
+.doc-placeholder:hover { border-color: var(--blue-light); color: var(--blue-light); }
+
+/* MATERIÁL */
+#mat-panel { padding: 20px; flex: 1; overflow-y: auto; }
+.mat-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+.mat-table { width: 100%; border-collapse: collapse; }
+.mat-table th, .mat-table td { padding: 10px 14px; text-align: left; border-bottom: 1px solid var(--border); font-size: 13px; }
+.mat-table th { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; background: var(--surface); }
+.mat-qty.low { color: var(--red); } .mat-qty.ok { color: var(--green); }
+.mat-progress { width: 80px; height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; }
+.mat-progress-fill { height: 100%; border-radius: 3px; background: var(--blue); }
+
+/* FAKTURACE */
+#bill-panel { padding: 20px; flex: 1; overflow-y: auto; }
+.bill-card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 24px; max-width: 600px; margin: 0 auto; }
+.bill-card h3 { font-size: 16px; font-weight: 600; margin-bottom: 20px; border-bottom: 1px solid var(--border); padding-bottom: 12px; }
+.bill-result { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; margin-top: 20px; text-align: center; }
+.bill-result .label { font-size: 12px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
+.bill-result .amount { font-size: 36px; font-weight: 700; color: var(--gold); }
+.bill-result .formula { font-size: 11px; color: var(--text-muted); margin-top: 6px; }
+.bill-breakdown { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-top: 16px; }
+.bill-item { background: var(--surface); border-radius: var(--radius); padding: 12px; text-align: center; }
+.bill-item .lbl { font-size: 11px; color: var(--text-muted); margin-bottom: 6px; }
+.bill-item .val { font-size: 20px; font-weight: 700; }
+
+/* DAY NAVIGATION */
+.day-nav { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.day-nav-btn { padding: 5px 14px; background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); color: var(--text); cursor: pointer; font-size: 12px; transition: all 0.15s; }
+.day-nav-btn:hover { border-color: var(--orange); color: var(--orange); }
+.day-nav-today { padding: 5px 12px; background: var(--blue); border: 1px solid var(--blue); border-radius: var(--radius); color: #fff; cursor: pointer; font-size: 11px; font-weight: 600; }
+.day-nav-today:hover { background: var(--blue-light); border-color: var(--blue-light); }
+
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: var(--bg); }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+</style>
+</head>
+<body>
+
+<!-- ── LOGIN SCREEN ── -->
+<div id="login-screen">
+  <div class="login-box">
+    <div class="login-logo">
+      <span class="logo-mark">⬡</span>
+      <span class="logo-name">NomadNT</span>
+      <div class="logo-sub">DUTEP11 · Dashboard Operátora</div>
+    </div>
+    <div id="login-error">⚠ Nesprávné přihlašovací údaje</div>
+    <div class="login-field">
+      <label>Uživatelské jméno</label>
+      <input type="text" id="login-user" placeholder="Admin" autocomplete="username" spellcheck="false">
+    </div>
+    <div class="login-field">
+      <label>Heslo</label>
+      <input type="password" id="login-pass" placeholder="••••••••••••" autocomplete="current-password">
+    </div>
+    <button id="login-btn" onclick="doLogin()">Přihlásit se</button>
+    <div id="login-countdown"></div>
+    <div class="login-footer">NomadNT Mockup v2.0 · Interní demo · CETIN DUTEP11</div>
+  </div>
+</div>
+
+<!-- TOP BAR -->
+<div id="topbar">
+  <div class="logo">⬡ NomadNT</div>
+  <div class="project-badge">DUTEP11 · Dubí · CETIN</div>
+  <div class="project-badge" id="record-count">0 záznamů</div>
+  <div class="project-badge">Mockup v2.0</div>
+  <div class="clock" id="clock">--:--:--</div>
+  <button id="logout-btn" onclick="doLogout()">⎋ Odhlásit</button>
+</div>
+
+<!-- STATS BAR -->
+<div id="statsbar">
+  <div class="stat-chip"><div class="dot" style="background:#8b949e"></div><span>Celkem</span><span class="val" id="s-total">0</span></div>
+  <div class="stat-chip"><div class="dot" style="background:var(--green)"></div><span>Uzavřeno</span><span class="val" id="s-uzavreno" style="color:var(--green)">0</span></div>
+  <div class="stat-chip"><div class="dot" style="background:var(--red)"></div><span>Nesouhlas</span><span class="val" id="s-nesouhlas" style="color:var(--red)">0</span></div>
+  <div class="stat-chip"><div class="dot" style="background:var(--yellow)"></div><span>Podepsáno</span><span class="val" id="s-podepsano" style="color:var(--yellow)">0</span></div>
+  <div class="stat-chip"><div class="dot" style="background:var(--blue-light)"></div><span>MSO</span><span class="val" id="s-mso" style="color:var(--blue-light)">0</span></div>
+  <div class="stat-chip"><div class="dot" style="background:var(--purple)"></div><span>VSO</span><span class="val" id="s-vso" style="color:var(--purple)">0</span></div>
+  <div class="stat-chip" style="border-color:var(--green)"><div class="dot" style="background:var(--green)"></div><span>Rozsvíceno</span><span class="val" id="s-done" style="color:var(--green)">0</span></div>
+  <div class="stat-chip" style="border-color:var(--orange)"><div class="dot" style="background:var(--orange)"></div><span>Dnes plánováno</span><span class="val" id="s-today" style="color:var(--orange)">0</span></div>
+</div>
+
+<!-- MODULE LEGEND -->
+<div id="modlegend"></div>
+
+<!-- CONTROLS -->
+<div id="controls">
+  <label class="file-label" for="csv-input">📂 Načíst CSV</label>
+  <input type="file" id="csv-input" accept=".csv">
+  <div class="separator"></div>
+  <input type="text" id="search-input" placeholder="🔍 Hledat bod zájmu, adresu, kontakt…">
+  <div class="separator"></div>
+  <button class="btn active" id="filter-all" onclick="setFilter('all')">Vše</button>
+  <button class="btn" id="filter-today" onclick="setFilter('today')">📅 Dnes</button>
+  <button class="btn" id="filter-mso" onclick="setFilter('mso')">MSO</button>
+  <button class="btn" id="filter-vada" onclick="setFilter('vada')">🔴 Vady</button>
+  <button class="btn" id="filter-uzavreno" onclick="setFilter('uzavreno')">Uzavřeno</button>
+  <div class="separator"></div>
+  <button class="btn" onclick="clearAllState()" style="color:var(--text-muted)">🗑 Reset</button>
+</div>
+
+<!-- FILTER + SORT BAR -->
+<div id="filterbar">
+  <span class="filter-label">Filtry:</span>
+  <select class="filter-select" id="flt-street" onchange="renderTable()"><option value="">Ulice: Vše</option></select>
+  <select class="filter-select" id="flt-etapa" onchange="renderTable()"><option value="">Etapa: Vše</option></select>
+  <select class="filter-select" id="flt-pon" onchange="renderTable()"><option value="">PON: Vše</option></select>
+  <select class="filter-select" id="flt-hp" onchange="renderTable()"><option value="">HP: Vše</option></select>
+  <select class="filter-select" id="flt-acq" onchange="renderTable()"><option value="">ACQ Status: Vše</option></select>
+  <select class="filter-select" id="flt-vr" onchange="renderTable()"><option value="">VR Typ: Vše</option></select>
+  <div class="separator"></div>
+  <span class="filter-label">Řadit:</span>
+  <button class="btn" id="sort-az" onclick="setSort('az')">A→Z</button>
+  <button class="btn" id="sort-za" onclick="setSort('za')">Z→A</button>
+  <button class="btn" id="sort-calendar" onclick="setSort('calendar')">📅 Kalendář</button>
+  <button class="btn" onclick="setSort('none')" style="color:var(--text-muted);font-size:11px" title="Zrušit řazení">↺</button>
+</div>
+
+<!-- TABS -->
+<div id="tabs">
+  <div class="tab active" onclick="switchTab('dashboard')">📋 Dashboard</div>
+  <div class="tab" onclick="switchTab('denniplan')">📅 Denní plán</div>
+  <div class="tab" onclick="switchTab('material')">🔧 Materiál</div>
+  <div class="tab" onclick="switchTab('fakturace')">💰 Fakturace</div>
+</div>
+
+<!-- CONTENT -->
+<div id="content">
+
+  <!-- DASHBOARD -->
+  <div class="tab-panel active" id="tab-dashboard">
+    <div id="empty-state">
+      <div class="icon">📁</div>
+      <h3>Načtěte CSV soubor</h3>
+      <p>Nahrajte exportovaný report akvizic (DUTEP11) ve formátu CSV. Data se zobrazí jako interaktivní dashboard s moduly pro každý bod zájmu.</p>
+      <label class="upload-big" for="csv-input">📂 Vybrat soubor CSV</label>
+    </div>
+    <div id="table-wrap" style="display:none">
+      <table id="main-table">
+        <thead>
+          <tr>
+            <th style="width:36px">#</th>
+            <th>Bod zájmu</th>
+            <th>Adresa</th>
+            <th>Kontakt</th>
+            <th class="center">Etapa</th>
+            <th class="center">PON</th>
+            <th class="center">HP</th>
+            <th class="center">Status ACQ</th>
+            <th class="center">VR Typ</th>
+            <th>Termín / Odpočet</th>
+            <th>Moduly ① ② ③ ④ ⑤ ⑥ · S · VR</th>
+            <th class="center">Detail</th>
+          </tr>
+        </thead>
+        <tbody id="table-body"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- DENNÍ PLÁN -->
+  <div class="tab-panel" id="tab-denniplan">
+    <div style="padding:20px; flex:1; overflow-y:auto">
+      <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:20px; flex-wrap:wrap; gap:12px;">
+        <div class="day-nav">
+          <button class="day-nav-btn" onclick="navigateDay(-1)">← Předchozí</button>
+          <div>
+            <div style="font-size:16px; font-weight:600">📅 <span id="daily-date"></span></div>
+            <span id="daily-today-badge" class="badge badge-orange" style="display:none;margin-top:4px;font-size:10px">● DNES</span>
+          </div>
+          <button class="day-nav-btn" onclick="navigateDay(1)">Následující →</button>
+          <button class="day-nav-today" onclick="goToToday()">Přejít na dnes</button>
+        </div>
+        <span style="color:var(--text-muted); font-size:12px; align-self:center">Zákazníci s naplánovanou prací na vybraný den</span>
+      </div>
+      <div id="daily-list"></div>
+    </div>
+  </div>
+
+  <!-- MATERIÁL -->
+  <div class="tab-panel" id="tab-material">
+    <div id="mat-panel">
+      <div class="mat-header">
+        <h3>🔧 Správa materiálu — Fasování</h3>
+        <button class="btn success" onclick="showMatModal()">+ Přidat materiál</button>
+      </div>
+      <table class="mat-table">
+        <thead><tr><th>Materiál</th><th>Kategorie</th><th>Naskladněno</th><th>Spotřebováno</th><th>Zůstatek</th><th>Vytížení</th><th>Akce</th></tr></thead>
+        <tbody id="mat-body"></tbody>
+      </table>
+      <div style="margin-top:20px; padding:16px; background:var(--surface); border-radius:var(--radius); border:1px solid var(--border); max-width:600px;">
+        <p style="font-size:12px; color:var(--text-muted); line-height:1.7">
+          <strong style="color:var(--text)">Fasování:</strong> Šéf týmu vydá materiál tlačítkem ⬇ Fasovat. Po dokončení etapy se spotřeba automaticky odečte. Zůstatek = Naskladněno − Spotřebováno.
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <!-- FAKTURACE -->
+  <div class="tab-panel" id="tab-fakturace">
+    <div id="bill-panel">
+      <div class="bill-card">
+        <h3>💰 Výpočet fakturace — Rozsvícení lokality</h3>
+        <div class="form-group">
+          <label>Celková smluvní suma (Kč)</label>
+          <input type="number" class="form-control" id="bill-total" placeholder="např. 5000000" oninput="calcBill()">
+        </div>
+        <div class="form-group">
+          <label>Celkový počet HP</label>
+          <input type="number" class="form-control" id="bill-hp-total" placeholder="např. 120" oninput="calcBill()">
+        </div>
+        <div class="form-group">
+          <label>Počet rozsvícených HP (všechny moduly ✓)</label>
+          <input type="number" class="form-control" id="bill-hp-lit" placeholder="např. 45" oninput="calcBill()">
+        </div>
+        <div class="bill-result" id="bill-result" style="display:none">
+          <div class="label">Fakturovaná částka</div>
+          <div class="amount" id="bill-amount">0 Kč</div>
+          <div class="formula" id="bill-formula"></div>
+        </div>
+        <div class="bill-breakdown" id="bill-breakdown" style="display:none">
+          <div class="bill-item"><div class="lbl">Cena za HP</div><div class="val" id="bill-per-hp" style="color:var(--blue-light)">0 Kč</div></div>
+          <div class="bill-item"><div class="lbl">Koef. rozsvícení</div><div class="val" style="color:var(--yellow)">0.60</div></div>
+          <div class="bill-item"><div class="lbl">Rozsvíceno HP</div><div class="val" id="bill-lit-count" style="color:var(--green)">0</div></div>
+        </div>
+        <div style="margin-top:20px; padding:14px; background:var(--surface); border-radius:var(--radius); border:1px solid var(--border);">
+          <p style="font-size:11px; color:var(--text-muted); line-height:1.7">
+            <strong style="color:var(--text)">Vzorec:</strong> (Celková suma ÷ Počet HP) × 0.6 × Počet rozsvícených HP<br>
+            <strong style="color:var(--text)">Rozsvícené HP</strong> = zákazník, u kterého jsou všechny moduly zelené.
+          </p>
+        </div>
+        <div style="margin-top:16px;"><h4 style="font-size:13px;margin-bottom:12px;color:var(--text-muted)">Automaticky z načtených dat:</h4>
+          <div id="bill-from-data" style="color:var(--text-muted);font-size:12px">Načtěte CSV data pro automatický výpočet.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: MODUL -->
+<div class="modal-overlay" id="mod-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="mod-modal-title">Modul</h3>
+      <button class="modal-close" onclick="closeModal('mod-modal')">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="mod-detail-header" id="mod-detail-header"></div>
+      <div class="info-grid" id="mod-info-grid"></div>
+      <div class="form-group">
+        <label>Naplánovat termín</label>
+        <input type="datetime-local" class="form-control" id="mod-datetime">
+      </div>
+      <div class="form-group">
+        <label>Poznámka</label>
+        <textarea class="form-control" id="mod-note" placeholder="Volitelná poznámka…"></textarea>
+      </div>
+      <div class="form-group">
+        <label>Stav modulu</label>
+        <div class="status-btn-group">
+          <button class="status-btn s-hotovo" onclick="setModStatus('hotovo')">✓ Hotovo</button>
+          <button class="status-btn s-vada" onclick="setModStatus('vada')">✗ Vada</button>
+          <button class="status-btn s-reset" onclick="setModStatus('pending')">↺ Obnovit</button>
+        </div>
+      </div>
+      <div id="seq-warning" style="display:none; padding:10px 14px; background:rgba(255,140,0,0.1); border:1px solid var(--orange); border-radius:var(--radius); color:var(--orange); font-size:12px; margin-top:8px;">
+        ⚠ Předchozí modul musí být nejprve HOTOVO, aby bylo možné plánovat tento krok.
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('mod-modal')">Zavřít</button>
+      <button class="btn active" onclick="saveModStatus()">💾 Uložit</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: DETAIL ZÁZNAMU -->
+<div class="modal-overlay" id="rec-modal">
+  <div class="modal modal-wide">
+    <div class="modal-header">
+      <h3 id="rec-modal-title">Detail záznamu</h3>
+      <button class="modal-close" onclick="closeModal('rec-modal')">×</button>
+    </div>
+    <div class="modal-body" id="rec-modal-body"></div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('rec-modal')">Zavřít</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: MATERIÁL -->
+<div class="modal-overlay" id="mat-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>Přidat materiál</h3>
+      <button class="modal-close" onclick="closeModal('mat-modal')">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group"><label>Název materiálu</label><input type="text" class="form-control" id="mat-name" placeholder="např. Mikrotrubička Ø7mm"></div>
+      <div class="form-group"><label>Kategorie</label>
+        <select class="form-control" id="mat-cat">
+          <option>Mikrotrubičky</option><option>Optický kabel</option><option>Spojky</option>
+          <option>Vrtací materiál</option><option>Záfukový materiál</option><option>Záhozový materiál</option><option>Ostatní</option>
+        </select>
+      </div>
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px">
+        <div class="form-group"><label>Množství</label><input type="number" class="form-control" id="mat-qty" placeholder="0"></div>
+        <div class="form-group"><label>Jednotka</label><input type="text" class="form-control" id="mat-unit" placeholder="m / ks / role"></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('mat-modal')">Zrušit</button>
+      <button class="btn success" onclick="addMaterial()">+ Přidat</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── AUTH ────────────────────────────────────────────────
+// Credentials are verified client-side using SHA-256.
+// Hash = SHA-256("ntcom@example.com"), username checked case-sensitively.
+const CRED_HASH = 'c26a0f907eadb91a1a8b95953af05169ac8d48b772fbc8780a5157b2582f25d7';
+const CRED_USER = 'Admin';
+const LOGIN_LOCKOUT_MS = 3000;
+
+let loginLocked = false;
+let lockCountdown = null;
+
+async function sha256(str) {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,'0')).join('');
+}
+
+async function doLogin() {
+  if (loginLocked) return;
+  const user = document.getElementById('login-user').value.trim();
+  const pass = document.getElementById('login-pass').value;
+  const hash = await sha256(pass);
+  if (user === CRED_USER && hash === CRED_HASH) {
+    sessionStorage.setItem('nomadnt_auth', '1');
+    document.getElementById('login-screen').classList.add('hidden');
+    document.getElementById('login-error').classList.remove('visible');
+  } else {
+    showLoginError();
+  }
+}
+
+function showLoginError() {
+  loginLocked = true;
+  const btn = document.getElementById('login-btn');
+  const errEl = document.getElementById('login-error');
+  const cdEl = document.getElementById('login-countdown');
+  const userIn = document.getElementById('login-user');
+  const passIn = document.getElementById('login-pass');
+  errEl.classList.add('visible');
+  userIn.classList.add('input-error');
+  passIn.classList.add('input-error');
+  btn.disabled = true;
+  let remaining = LOGIN_LOCKOUT_MS / 1000;
+  cdEl.textContent = `Další pokus za ${remaining} s`;
+  lockCountdown = setInterval(() => {
+    remaining--;
+    if (remaining <= 0) {
+      clearInterval(lockCountdown);
+      loginLocked = false;
+      btn.disabled = false;
+      cdEl.textContent = '';
+      userIn.classList.remove('input-error');
+      passIn.classList.remove('input-error');
+    } else {
+      cdEl.textContent = `Další pokus za ${remaining} s`;
+    }
+  }, 1000);
+}
+
+function doLogout() {
+  sessionStorage.removeItem('nomadnt_auth');
+  document.getElementById('login-screen').classList.remove('hidden');
+  document.getElementById('login-pass').value = '';
+  document.getElementById('login-error').classList.remove('visible');
+  document.getElementById('login-countdown').textContent = '';
+}
+
+// Enter key on login form
+document.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !document.getElementById('login-screen').classList.contains('hidden')) {
+    doLogin();
+  }
+});
+
+// Check session on load
+(function() {
+  if (sessionStorage.getItem('nomadnt_auth') === '1') {
+    document.getElementById('login-screen').classList.add('hidden');
+  }
+})();
+
+// ── APP ─────────────────────────────────────────────────
+const MODULE_NAMES = { 1:'Výkop', 2:'Matrix', 3:'MT pokládka', 4:'Vrtání', 5:'Záfuk', 6:'Zához', 7:'Sváry', 8:'VR Construction' };
+const MODULE_ICONS = { 1:'⛏', 2:'🗺', 3:'🔩', 4:'🔄', 5:'💨', 6:'🏗', 7:'🔥', 8:'🏢' };
+const SEQ = [1,2,3,4,5,6];
+
+let records = [], moduleState = {}, materials = [];
+let currentFilter = 'all', currentSearch = '', currentSort = 'none';
+let currentPlanDay = new Date().toISOString().slice(0,10);
+let editingMod = null;
+
+// ── STATE PERSISTENCE ──────────────────────────────────
+function loadState() {
+  try { const s = localStorage.getItem('nomadnt_mod_state'); if(s) moduleState = JSON.parse(s); } catch(e){}
+  try { const m = localStorage.getItem('nomadnt_materials'); if(m) materials = JSON.parse(m); } catch(e){}
+}
+function saveState() {
+  localStorage.setItem('nomadnt_mod_state', JSON.stringify(moduleState));
+  localStorage.setItem('nomadnt_materials', JSON.stringify(materials));
+}
+function clearAllState() {
+  if(!confirm('Opravdu resetovat všechny stavy modulů?')) return;
+  moduleState = {}; saveState(); renderTable(); updateStats(); renderModLegend();
+}
+function getModState(id, m) {
+  if(!moduleState[id]) return {status:'pending',date:'',note:''};
+  return moduleState[id][m] || {status:'pending',date:'',note:''};
+}
+function setModState(id, m, data) {
+  if(!moduleState[id]) moduleState[id] = {};
+  moduleState[id][m] = {...getModState(id,m), ...data}; saveState();
+}
+
+// ── CSV LOADING ────────────────────────────────────────
+document.getElementById('csv-input').addEventListener('change', function(e) {
+  const file = e.target.files[0]; if(!file) return;
+  Papa.parse(file, { skipEmptyLines:true, complete: function(res) {
+    records = res.data.slice(1).map((r,i) => parseRow(r,i)).filter(r => r.ropId);
+    document.getElementById('empty-state').style.display = 'none';
+    document.getElementById('table-wrap').style.display = 'block';
+    document.getElementById('record-count').textContent = records.length + ' záznamů';
+    populateDropdowns();
+    renderTable(); updateStats(); renderModLegend();
+    renderDailyPlan(); renderMaterials(); updateBillingFromData();
+  }, error: e => alert('Chyba CSV: '+e.message) });
+});
+
+function parseRow(r, i) {
+  const g = k => (r[k]||'').trim();
+  return { idx:i+1, ropId:g(11), bodZajmu:g(9), etapa:g(8), pon:g(10), vrType:g(6).toUpperCase(),
+    mesto:g(12), ulice:g(13), cp:g(14), co:g(15), parcelni:g(16), ku:g(17),
+    pocetHp:parseInt(g(18))||0, typDomu:g(19), pocetBj:g(20),
+    statusAcq:g(23), duvodNesouhlas:g(24), zpusobPripojeni:g(25)||g(26),
+    majitel:g(30), kontaktOsoba:g(31), kontaktMail:g(32), kontaktTel:g(33),
+    poznamka:g(34), plan:g(35), terminAcq:g(22) };
+}
+
+// ── DROPDOWN FILTERS ───────────────────────────────────
+function populateDropdowns() {
+  const uniq = (arr) => [...new Set(arr.filter(Boolean))];
+  const fillSel = (id, values, label) => {
+    const el = document.getElementById(id);
+    el.innerHTML = `<option value="">${label}: Vše</option>` +
+      values.map(v => `<option value="${v}">${v}</option>`).join('');
+  };
+  fillSel('flt-street', uniq(records.map(r=>r.ulice)).sort(), 'Ulice');
+  fillSel('flt-etapa', uniq(records.map(r=>r.etapa)).sort(), 'Etapa');
+  fillSel('flt-pon', uniq(records.map(r=>r.pon)).sort((a,b)=>parseInt(a)-parseInt(b)), 'PON');
+  fillSel('flt-hp', uniq(records.map(r=>String(r.pocetHp))).sort((a,b)=>parseInt(a)-parseInt(b)), 'HP');
+  fillSel('flt-acq', uniq(records.map(r=>r.statusAcq)).sort(), 'ACQ');
+  fillSel('flt-vr', uniq(records.map(r=>r.vrType)).sort(), 'VR Typ');
+}
+
+// ── COUNTDOWN ─────────────────────────────────────────
+function formatCountdown(dateStr) {
+  if(!dateStr) return null;
+  const now = new Date(), target = new Date(dateStr);
+  const diffMs = target - now;
+  const diffMin = Math.floor(diffMs/60000);
+  const diffHr = Math.floor(diffMs/3600000);
+  const diffDay = Math.floor(diffMs/86400000);
+  if(diffMs < -3600000) {
+    const agoDays = Math.abs(Math.ceil(diffMs/86400000));
+    return {text: agoDays === 0 ? 'dnes (minulé)' : `před ${agoDays} d`, cls:'cd-past'};
+  }
+  if(diffMs < 0) return {text:'právě teď', cls:'cd-today'};
+  if(diffMin < 60) return {text:`za ${diffMin} min`, cls:'cd-today'};
+  if(diffHr < 24) return {text:`za ${diffHr} hod`, cls:'cd-near'};
+  if(diffDay === 1) return {text:`zítra`, cls:'cd-near'};
+  if(diffDay < 7) return {text:`za ${diffDay} dní`, cls:'cd-near'};
+  return {text:`za ${diffDay} dní`, cls:'cd-future'};
+}
+
+function getNearestScheduled(rec) {
+  const mods=[1,2,3,4,5,6,7]; if(rec.vrType==='MSO') mods.push(8);
+  let nearest = null;
+  mods.forEach(m => {
+    const st = getModState(rec.ropId,m);
+    if(st.date && st.status==='pending') {
+      if(!nearest || new Date(st.date) < new Date(nearest.date))
+        nearest = {modNum:m, date:st.date};
+    }
+  });
+  return nearest;
+}
+
+// ── MODULE LEGEND ─────────────────────────────────────
+function renderModLegend() {
+  const el = document.getElementById('modlegend');
+  if(!records.length) { el.style.display='none'; return; }
+  el.style.display='flex';
+  const counts={};
+  for(let m=1;m<=8;m++) counts[m]={pending:0,sched:0,vada:0,hotovo:0};
+  records.forEach(rec => {
+    const mods=[1,2,3,4,5,6,7]; if(rec.vrType==='MSO') mods.push(8);
+    mods.forEach(m => {
+      const st=getModState(rec.ropId,m);
+      if(st.status==='hotovo') counts[m].hotovo++;
+      else if(st.status==='vada') counts[m].vada++;
+      else if(st.date) counts[m].sched++;
+      else counts[m].pending++;
+    });
+  });
+  const icons={1:'⛏',2:'🗺',3:'🔩',4:'🔄',5:'💨',6:'🏗',7:'🔥',8:'🏢'};
+  const names={1:'Výkop',2:'Matrix',3:'MT pokl.',4:'Vrtání',5:'Záfuk',6:'Zához',7:'Sváry',8:'VR Const.'};
+  let h = '<span class="legend-label" style="margin-right:4px">Moduly:</span>';
+  for(let m=1;m<=8;m++) {
+    const c=counts[m];
+    h += `<div class="mod-legend-chip" title="${MODULE_NAMES[m]}">
+      <span>${icons[m]}</span>
+      <span class="mod-legend-name">${names[m]}</span>
+      <span class="lc-pending" title="Čeká">${c.pending}</span>
+      <span class="lc-sep">·</span>
+      <span class="lc-sched" title="Naplánováno 🟠">${c.sched}</span>
+      <span class="lc-sep">·</span>
+      <span class="lc-vada" title="Vada 🔴">${c.vada}</span>
+      <span class="lc-sep">·</span>
+      <span class="lc-hotovo" title="Hotovo 🟢">${c.hotovo}</span>
+    </div>`;
+  }
+  el.innerHTML = h;
+}
+
+// ── FILTERING & SORTING ────────────────────────────────
+function isModLocked(rec, m) {
+  const idx=SEQ.indexOf(m); if(idx<=0) return false;
+  return getModState(rec.ropId,SEQ[idx-1]).status!=='hotovo';
+}
+function isLitUp(rec) {
+  const mods=[1,2,3,4,5,6,7]; if(rec.vrType==='MSO') mods.push(8);
+  return mods.every(m=>getModState(rec.ropId,m).status==='hotovo');
+}
+
+function getFilteredRecords() {
+  let list = records;
+  const today = new Date().toISOString().slice(0,10);
+  if(currentFilter==='today') list=list.filter(r=>Object.values(moduleState[r.ropId]||{}).some(m=>m.date&&m.date.startsWith(today)));
+  else if(currentFilter==='mso') list=list.filter(r=>r.vrType==='MSO');
+  else if(currentFilter==='vada') list=list.filter(r=>Object.values(moduleState[r.ropId]||{}).some(m=>m.status==='vada'));
+  else if(currentFilter==='uzavreno') list=list.filter(r=>r.statusAcq==='Uzavřeno');
+
+  const sv=v=>document.getElementById(v)?.value||'';
+  const st=sv('flt-street'), et=sv('flt-etapa'), po=sv('flt-pon'), hp=sv('flt-hp'), aq=sv('flt-acq'), vr=sv('flt-vr');
+  if(st) list=list.filter(r=>r.ulice===st);
+  if(et) list=list.filter(r=>r.etapa===et);
+  if(po) list=list.filter(r=>r.pon===po);
+  if(hp) list=list.filter(r=>r.pocetHp===parseInt(hp));
+  if(aq) list=list.filter(r=>r.statusAcq===aq);
+  if(vr) list=list.filter(r=>r.vrType===vr);
+
+  if(currentSearch) {
+    const q=currentSearch.toLowerCase();
+    list=list.filter(r=>r.bodZajmu.includes(q)||r.ulice.toLowerCase().includes(q)||r.cp.includes(q)||r.mesto.toLowerCase().includes(q)||r.kontaktOsoba.toLowerCase().includes(q)||r.kontaktTel.includes(q)||r.ropId.includes(q));
+  }
+  return getSortedRecords(list);
+}
+
+function setSort(s) {
+  currentSort=s;
+  ['az','za','calendar'].forEach(id=>{const el=document.getElementById('sort-'+id); if(el) el.classList.toggle('active',id===s);});
+  renderTable();
+}
+
+function getSortedRecords(list) {
+  if(currentSort==='az') return [...list].sort((a,b)=>(a.ulice+a.cp).localeCompare(b.ulice+b.cp,'cs'));
+  if(currentSort==='za') return [...list].sort((a,b)=>(b.ulice+b.cp).localeCompare(a.ulice+a.cp,'cs'));
+  if(currentSort==='calendar') {
+    return [...list].sort((a,b)=>{
+      const na=getNearestScheduled(a), nb=getNearestScheduled(b);
+      if(!na&&!nb) return 0; if(!na) return 1; if(!nb) return -1;
+      return new Date(na.date)-new Date(nb.date);
+    });
+  }
+  return list;
+}
+
+// ── TABLE RENDERING ────────────────────────────────────
+function renderModSquares(rec) {
+  const indep=[7]; if(rec.vrType==='MSO') indep.push(8);
+  let h='<div class="modules-cell">';
+  SEQ.forEach(m=>{
+    const st=getModState(rec.ropId,m), locked=isModLocked(rec,m);
+    let cls=locked?'pending locked':(st.status!=='pending'?st.status:(st.date?'scheduled':'pending'));
+    h+=`<div class="mod-sq ${cls}" title="${MODULE_NAMES[m]}${st.date?'\n📅 '+st.date.slice(0,16).replace('T',' '):''}" onclick="${locked?'':("openModModal('"+rec.ropId+"',"+m+")")}">${m}</div>`;
+  });
+  h+='<div class="mod-divider"></div>';
+  indep.forEach(m=>{
+    const st=getModState(rec.ropId,m), cls=st.status!=='pending'?st.status:(st.date?'scheduled':'pending');
+    h+=`<div class="mod-sq ${cls}" title="${MODULE_NAMES[m]}" onclick="openModModal('${rec.ropId}',${m})">${m===7?'S':'VR'}</div>`;
+  });
+  h+='</div>'; return h;
+}
+
+function renderTable() {
+  const list=getFilteredRecords(), today=new Date().toISOString().slice(0,10);
+  let h='';
+  list.forEach((rec,i)=>{
+    const hasToday=Object.values(moduleState[rec.ropId]||{}).some(m=>m.date&&m.date.startsWith(today));
+    const litUp=isLitUp(rec);
+    let rowCls=(hasToday?' highlight-today':'')+(rec.statusAcq==='Nesouhlas'?' row-nesouhlas':'');
+    const acqB=rec.statusAcq==='Uzavřeno'?'badge-green':rec.statusAcq==='Nesouhlas'?'badge-red':rec.statusAcq==='Podepsáno'?'badge-yellow':'badge-gray';
+    const vrB=rec.vrType==='MSO'?'badge-blue':rec.vrType==='VSO'?'badge-purple':'badge-gray';
+
+    const near=getNearestScheduled(rec);
+    let terminCell='<span style="color:var(--border)">—</span>';
+    if(near) {
+      const cd=formatCountdown(near.date);
+      const ds=near.date.replace('T',' ').slice(0,16);
+      terminCell=`<div style="font-size:10px;color:var(--text-muted)">${MODULE_ICONS[near.modNum]} ${MODULE_NAMES[near.modNum]}</div>
+        <div style="font-size:12px;font-weight:600;color:var(--orange)">${ds}</div>
+        ${cd?`<div class="${cd.cls}">⏱ ${cd.text}</div>`:''}`;
+    }
+
+    h+=`<tr class="${rowCls}">
+      <td style="color:var(--text-muted);font-size:11px">${i+1}</td>
+      <td><div style="font-weight:600;color:var(--blue-light)">#${rec.bodZajmu}</div><div style="font-size:10px;color:var(--text-muted)">ROP: ${rec.ropId}</div></td>
+      <td><div class="addr-line1">${rec.ulice} ${rec.cp}${rec.co?'/'+rec.co:''}</div><div class="addr-line2">${rec.mesto}</div></td>
+      <td><div style="font-size:12px">${rec.kontaktOsoba||'—'}</div><div style="font-size:11px;color:var(--text-muted)">${rec.kontaktTel||''}</div></td>
+      <td class="center"><span class="badge badge-gray">${rec.etapa}</span></td>
+      <td class="center" style="color:var(--text-muted)">${rec.pon}</td>
+      <td class="center" style="font-weight:600;color:var(--gold)">${rec.pocetHp}</td>
+      <td class="center"><span class="badge ${acqB}">${rec.statusAcq||'?'}</span></td>
+      <td class="center"><span class="badge ${vrB}">${rec.vrType||'—'}</span></td>
+      <td style="min-width:140px">${terminCell}</td>
+      <td>${renderModSquares(rec)}${litUp?'<span class="badge badge-green" style="margin-left:6px;font-size:9px">✓ LIT</span>':''}</td>
+      <td class="center"><button class="icon-btn" onclick="openRecModal('${rec.ropId}')">👁</button></td>
+    </tr>`;
+  });
+  document.getElementById('table-body').innerHTML=h||'<tr><td colspan="12" style="text-align:center;padding:40px;color:var(--text-muted)">Žádné záznamy</td></tr>';
+}
+
+// ── STATS ──────────────────────────────────────────────
+function updateStats() {
+  const today=new Date().toISOString().slice(0,10);
+  document.getElementById('s-total').textContent=records.length;
+  document.getElementById('s-uzavreno').textContent=records.filter(r=>r.statusAcq==='Uzavřeno').length;
+  document.getElementById('s-nesouhlas').textContent=records.filter(r=>r.statusAcq==='Nesouhlas').length;
+  document.getElementById('s-podepsano').textContent=records.filter(r=>r.statusAcq==='Podepsáno').length;
+  document.getElementById('s-mso').textContent=records.filter(r=>r.vrType==='MSO').length;
+  document.getElementById('s-vso').textContent=records.filter(r=>r.vrType==='VSO').length;
+  document.getElementById('s-done').textContent=records.filter(r=>isLitUp(r)).length;
+  document.getElementById('s-today').textContent=records.filter(r=>Object.values(moduleState[r.ropId]||{}).some(m=>m.date&&m.date.startsWith(today))).length;
+}
+
+// ── MODULE MODAL ───────────────────────────────────────
+function openModModal(ropId, modNum) {
+  const rec=records.find(r=>r.ropId===ropId); if(!rec) return;
+  editingMod={ropId,modNum};
+  const st=getModState(ropId,modNum), locked=isModLocked(rec,modNum);
+  const colors={pending:'#8b949e',scheduled:'#ff8c00',hotovo:'#28a745',vada:'#dc3545'};
+  const col=colors[st.status]||colors.pending;
+  document.getElementById('mod-modal-title').textContent=MODULE_NAMES[modNum]+' — Modul '+modNum;
+  document.getElementById('mod-detail-header').innerHTML=`
+    <div class="mod-detail-icon" style="background:${col}22;border:2px solid ${col}"><span style="font-size:20px">${MODULE_ICONS[modNum]}</span></div>
+    <div><div class="mod-detail-name">${MODULE_NAMES[modNum]}</div><div class="mod-detail-sub">Bod #${rec.bodZajmu} · ${rec.ulice} ${rec.cp} · ${rec.mesto}</div></div>`;
+  const cd = st.date ? formatCountdown(st.date) : null;
+  document.getElementById('mod-info-grid').innerHTML=`
+    <div class="info-item"><div class="lbl">ROP ID</div><div class="val">${ropId}</div></div>
+    <div class="info-item"><div class="lbl">Kontakt</div><div class="val">${rec.kontaktOsoba||'—'}<br><span style="color:var(--text-muted);font-size:11px">${rec.kontaktTel||''}</span></div></div>
+    <div class="info-item"><div class="lbl">Aktuální stav</div><div class="val"><span class="badge badge-${st.status==='hotovo'?'green':st.status==='vada'?'red':st.date?'orange':'gray'}">${st.status.toUpperCase()}</span></div></div>
+    <div class="info-item"><div class="lbl">Termín / Odpočet</div><div class="val">${st.date?st.date.slice(0,16).replace('T',' '):'—'}${cd?`<br><span class="${cd.cls}">⏱ ${cd.text}</span>`:''}</div></div>`;
+  document.getElementById('mod-datetime').value=st.date||'';
+  document.getElementById('mod-note').value=st.note||'';
+  document.getElementById('seq-warning').style.display=locked?'block':'none';
+  document.getElementById('mod-datetime').disabled=locked;
+  document.getElementById('mod-note').disabled=locked;
+  document.querySelectorAll('.status-btn').forEach(b=>b.disabled=locked);
+  document.getElementById('mod-modal').classList.add('open');
+}
+
+function setModStatus(status) {
+  if(!editingMod) return;
+  const {ropId,modNum}=editingMod;
+  if(isModLocked(records.find(r=>r.ropId===ropId),modNum)) return;
+  setModState(ropId,modNum,{status}); renderTable(); updateStats(); renderModLegend();
+}
+
+function saveModStatus() {
+  if(!editingMod) return;
+  const {ropId,modNum}=editingMod;
+  setModState(ropId,modNum,{date:document.getElementById('mod-datetime').value, note:document.getElementById('mod-note').value});
+  renderTable(); updateStats(); renderModLegend(); renderDailyPlan(); updateBillingFromData(); closeModal('mod-modal');
+}
+
+// ── RECORD DETAIL ──────────────────────────────────────
+function openRecModal(ropId) {
+  const rec=records.find(r=>r.ropId===ropId); if(!rec) return;
+  document.getElementById('rec-modal-title').textContent='Detail — Bod zájmu #'+rec.bodZajmu;
+  const mods=[1,2,3,4,5,6,7]; if(rec.vrType==='MSO') mods.push(8);
+  const litUp=isLitUp(rec);
+  const modRows=mods.map(m=>{
+    const st=getModState(ropId,m);
+    const cd=st.date?formatCountdown(st.date):null;
+    return `<div class="detail-row"><span class="dk">${MODULE_ICONS[m]} ${MODULE_NAMES[m]}</span><span class="dv"><span class="badge badge-${st.status==='hotovo'?'green':st.status==='vada'?'red':st.date?'orange':'gray'}">${st.status.toUpperCase()}</span>${st.date?` <span style="font-size:10px;color:var(--text-muted)">${st.date.slice(0,16).replace('T',' ')}</span>`:''} ${cd?`<span class="${cd.cls}">⏱${cd.text}</span>`:''}</span></div>`;
+  }).join('');
+  document.getElementById('rec-modal-body').innerHTML=`
+    <div class="detail-section"><h4>Identifikace & Adresa</h4>
+      <div class="detail-row"><span class="dk">Bod zájmu</span><span class="dv">#${rec.bodZajmu}</span></div>
+      <div class="detail-row"><span class="dk">ROP ID</span><span class="dv">${rec.ropId}</span></div>
+      <div class="detail-row"><span class="dk">Adresa</span><span class="dv">${rec.ulice} ${rec.cp}${rec.co?'/'+rec.co:''}, ${rec.mesto}</span></div>
+      <div class="detail-row"><span class="dk">Parcelní číslo</span><span class="dv">${rec.parcelni||'—'}</span></div>
+      <div class="detail-row"><span class="dk">Typ domu</span><span class="dv">${rec.typDomu||'—'}</span></div>
+      <div class="detail-row"><span class="dk">Počet HP</span><span class="dv" style="color:var(--gold)">${rec.pocetHp}</span></div>
+      <div class="detail-row"><span class="dk">VR Typ</span><span class="dv">${rec.vrType||'—'}</span></div>
+      <div class="detail-row"><span class="dk">Etapa / PON</span><span class="dv">${rec.etapa} / ${rec.pon}</span></div>
+    </div>
+    <div class="detail-section"><h4>Akvizice</h4>
+      <div class="detail-row"><span class="dk">Status ACQ</span><span class="dv">${rec.statusAcq}</span></div>
+      <div class="detail-row"><span class="dk">Termín uzavření</span><span class="dv">${rec.terminAcq||'—'}</span></div>
+      <div class="detail-row"><span class="dk">Způsob připojení</span><span class="dv">${rec.zpusobPripojeni||'—'}</span></div>
+      ${rec.duvodNesouhlas?`<div class="detail-row"><span class="dk">Důvod nesouhlasu</span><span class="dv" style="color:var(--red)">${rec.duvodNesouhlas}</span></div>`:''}
+    </div>
+    <div class="detail-section"><h4>Kontakt</h4>
+      <div class="detail-row"><span class="dk">Majitel</span><span class="dv" style="max-width:65%;font-size:11px">${rec.majitel||'—'}</span></div>
+      <div class="detail-row"><span class="dk">Kontaktní osoba</span><span class="dv">${rec.kontaktOsoba||'—'}</span></div>
+      <div class="detail-row"><span class="dk">Telefon</span><span class="dv">${rec.kontaktTel||'—'}</span></div>
+      <div class="detail-row"><span class="dk">Email</span><span class="dv">${rec.kontaktMail||'—'}</span></div>
+      ${rec.poznamka?`<div class="detail-row"><span class="dk">Poznámka</span><span class="dv">${rec.poznamka}</span></div>`:''}
+    </div>
+    <div class="detail-section"><h4>Stav modulů ${litUp?'<span class="badge badge-green" style="margin-left:6px">✓ Rozsvíceno</span>':''}</h4>${modRows}</div>
+    <div class="detail-section"><h4>Revizní dokumentace</h4>
+      ${litUp?`<div class="doc-placeholder" onclick="alert('Nahrání dokumentace bude implementováno v produkční verzi.')"><div style="font-size:28px;margin-bottom:8px">📄</div><div style="font-weight:600;margin-bottom:4px">Nahrát GEO projekt</div><div style="font-size:11px">Schémata trubiček, kabely, revizní dokumentace</div></div>`:'<div style="color:var(--text-muted);font-size:12px;padding:12px 0">Dostupné až po dokončení všech modulů.</div>'}
+    </div>`;
+  document.getElementById('rec-modal').classList.add('open');
+}
+
+// ── DENNÍ PLÁN ─────────────────────────────────────────
+function navigateDay(delta) {
+  const d=new Date(currentPlanDay); d.setDate(d.getDate()+delta);
+  currentPlanDay=d.toISOString().slice(0,10);
+  renderDailyPlan();
+}
+function goToToday() {
+  currentPlanDay=new Date().toISOString().slice(0,10);
+  renderDailyPlan();
+}
+
+function renderDailyPlan() {
+  const todayStr=new Date().toISOString().slice(0,10);
+  const isToday=currentPlanDay===todayStr;
+  const d=new Date(currentPlanDay+'T12:00:00');
+  document.getElementById('daily-date').textContent=d.toLocaleDateString('cs-CZ',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
+  const badge=document.getElementById('daily-today-badge');
+  badge.style.display=isToday?'inline-block':'none';
+
+  const planned=[];
+  records.forEach(rec=>{
+    const st=moduleState[rec.ropId]||{};
+    Object.entries(st).forEach(([m,ms])=>{
+      if(ms.date&&ms.date.startsWith(currentPlanDay)&&ms.status==='pending')
+        planned.push({rec,modNum:parseInt(m),modSt:ms});
+    });
+  });
+  planned.sort((a,b)=>a.modSt.date>b.modSt.date?1:-1);
+
+  if(!planned.length) {
+    document.getElementById('daily-list').innerHTML=`<div style="text-align:center;padding:60px;color:var(--text-muted)">
+      <div style="font-size:40px;margin-bottom:12px">📅</div>
+      <div style="font-size:16px;margin-bottom:8px">Žádná práce naplánována na ${isToday?'dnes':'tento den'}</div>
+      <div style="font-size:13px">Nastavte termíny v dashboardu kliknutím na čtverečky modulů.</div>
+    </div>`;
+    return;
+  }
+
+  let h=`<div style="color:var(--text-muted);font-size:12px;margin-bottom:16px">${planned.length} naplánovaných kroků</div>`;
+  planned.forEach(({rec,modNum,modSt})=>{
+    const time=modSt.date?modSt.date.slice(11,16):'—';
+    const cd=formatCountdown(modSt.date);
+    h+=`<div style="background:var(--card);border:1px solid var(--border);border-left:4px solid var(--orange);border-radius:var(--radius);padding:14px 16px;margin-bottom:10px;display:flex;align-items:center;gap:16px">
+      <div style="font-size:24px;flex-shrink:0">${MODULE_ICONS[modNum]}</div>
+      <div style="flex:1">
+        <div style="font-weight:600;font-size:14px">${MODULE_NAMES[modNum]}</div>
+        <div style="color:var(--text-muted);font-size:12px;margin-top:2px">Bod #${rec.bodZajmu} · ${rec.ulice} ${rec.cp} · ${rec.mesto}</div>
+        <div style="color:var(--text-muted);font-size:11px">${rec.kontaktOsoba||''} ${rec.kontaktTel?'· ☎ '+rec.kontaktTel:''}</div>
+        ${cd?`<div class="${cd.cls}" style="margin-top:3px">⏱ ${cd.text}</div>`:''}
+      </div>
+      <div style="text-align:right;flex-shrink:0">
+        <div style="font-size:22px;font-weight:700;color:var(--orange)">${time}</div>
+        <div style="font-size:11px;color:var(--text-muted)">Čas</div>
+      </div>
+      <button class="btn success" onclick="quickComplete('${rec.ropId}',${modNum})">✓ Hotovo</button>
+    </div>`;
+  });
+  document.getElementById('daily-list').innerHTML=h;
+}
+
+function quickComplete(ropId,modNum) {
+  setModState(ropId,modNum,{status:'hotovo'});
+  renderTable(); updateStats(); renderModLegend(); renderDailyPlan(); updateBillingFromData();
+}
+
+// ── MATERIÁL ───────────────────────────────────────────
+function renderMaterials() {
+  if(!materials.length) {
+    materials=[
+      {id:1,name:'Mikrotrubička Ø7mm',cat:'Mikrotrubičky',qty:5000,used:1200,unit:'m'},
+      {id:2,name:'Optický kabel 12F',cat:'Optický kabel',qty:3000,used:800,unit:'m'},
+      {id:3,name:'Spojka Ø40mm',cat:'Spojky',qty:200,used:45,unit:'ks'},
+      {id:4,name:'Bentonit',cat:'Záhozový materiál',qty:500,used:220,unit:'kg'},
+      {id:5,name:'Vrtací tyče 2m',cat:'Vrtací materiál',qty:50,used:12,unit:'ks'},
+    ]; saveState();
+  }
+  let h='';
+  materials.forEach((m,i)=>{
+    const rem=m.qty-m.used, pct=Math.round((m.used/m.qty)*100), low=rem<m.qty*0.2;
+    h+=`<tr>
+      <td>${m.name}</td><td><span class="badge badge-gray">${m.cat}</span></td>
+      <td class="mat-qty ok">${m.qty} ${m.unit}</td>
+      <td class="mat-qty" style="color:var(--text-muted)">${m.used} ${m.unit}</td>
+      <td class="mat-qty ${low?'low':'ok'}">${rem} ${m.unit}</td>
+      <td><div class="mat-progress"><div class="mat-progress-fill" style="width:${pct}%;background:${low?'var(--red)':'var(--blue)'}"></div></div><div style="font-size:10px;color:var(--text-muted);margin-top:2px">${pct}%</div></td>
+      <td><button class="btn" style="font-size:11px;padding:3px 8px" onclick="fasovat(${i})">⬇ Fasovat</button> <button class="icon-btn" onclick="removeMat(${i})">🗑</button></td>
+    </tr>`;
+  });
+  document.getElementById('mat-body').innerHTML=h;
+}
+function fasovat(idx) {
+  const a=parseInt(prompt(`Fasovat "${materials[idx].name}" (${materials[idx].unit}):`, '10'));
+  if(!a||isNaN(a)) return;
+  materials[idx].used=Math.min(materials[idx].used+a,materials[idx].qty);
+  saveState(); renderMaterials();
+}
+function removeMat(idx) {
+  if(!confirm(`Odebrat "${materials[idx].name}"?`)) return;
+  materials.splice(idx,1); saveState(); renderMaterials();
+}
+function showMatModal() { document.getElementById('mat-modal').classList.add('open'); }
+function addMaterial() {
+  const name=document.getElementById('mat-name').value.trim();
+  if(!name) { alert('Zadejte název.'); return; }
+  materials.push({id:Date.now(),name,cat:document.getElementById('mat-cat').value,qty:parseInt(document.getElementById('mat-qty').value)||0,used:0,unit:document.getElementById('mat-unit').value.trim()||'ks'});
+  saveState(); renderMaterials(); closeModal('mat-modal');
+  document.getElementById('mat-name').value=''; document.getElementById('mat-qty').value='';
+}
+
+// ── FAKTURACE ──────────────────────────────────────────
+function calcBill() {
+  const total=parseFloat(document.getElementById('bill-total').value)||0;
+  const hpT=parseInt(document.getElementById('bill-hp-total').value)||0;
+  const hpL=parseInt(document.getElementById('bill-hp-lit').value)||0;
+  if(!total||!hpT||!hpL) { document.getElementById('bill-result').style.display='none'; document.getElementById('bill-breakdown').style.display='none'; return; }
+  const perHp=total/hpT, amount=perHp*0.6*hpL;
+  const fmt=n=>new Intl.NumberFormat('cs-CZ',{style:'currency',currency:'CZK',maximumFractionDigits:0}).format(n);
+  document.getElementById('bill-amount').textContent=fmt(amount);
+  document.getElementById('bill-formula').textContent=`(${fmt(total)} ÷ ${hpT} HP) × 0.6 × ${hpL} rozsvícených HP`;
+  document.getElementById('bill-per-hp').textContent=fmt(perHp);
+  document.getElementById('bill-lit-count').textContent=hpL;
+  document.getElementById('bill-result').style.display='block';
+  document.getElementById('bill-breakdown').style.display='grid';
+}
+function updateBillingFromData() {
+  if(!records.length) return;
+  const litRecs=records.filter(r=>isLitUp(r));
+  const totalHp=records.reduce((a,r)=>a+r.pocetHp,0);
+  const litHp=litRecs.reduce((a,r)=>a+r.pocetHp,0);
+  document.getElementById('bill-from-data').innerHTML=`
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:8px">
+      <div class="bill-item"><div class="lbl">Celkem HP</div><div class="val" style="color:var(--text)">${totalHp}</div></div>
+      <div class="bill-item"><div class="lbl">Rozsvíceno HP</div><div class="val" style="color:var(--green)">${litHp}</div></div>
+      <div class="bill-item"><div class="lbl">Rozsvícených objektů</div><div class="val" style="color:var(--gold)">${litRecs.length}</div></div>
+    </div>`;
+  if(!document.getElementById('bill-hp-total').value) document.getElementById('bill-hp-total').value=totalHp;
+  if(!document.getElementById('bill-hp-lit').value) document.getElementById('bill-hp-lit').value=litHp;
+  calcBill();
+}
+
+// ── FILTERS / SEARCH / TABS ────────────────────────────
+function setFilter(f) {
+  currentFilter=f;
+  ['all','today','mso','vada','uzavreno'].forEach(id=>{const el=document.getElementById('filter-'+id); if(el) el.classList.toggle('active',id===f);});
+  renderTable();
+}
+document.getElementById('search-input').addEventListener('input',function(){ currentSearch=this.value.trim(); renderTable(); });
+
+function switchTab(t) {
+  const tabs=['dashboard','denniplan','material','fakturace'];
+  document.querySelectorAll('.tab').forEach((el,i)=>el.classList.toggle('active',tabs[i]===t));
+  document.querySelectorAll('.tab-panel').forEach(el=>el.classList.remove('active'));
+  document.getElementById('tab-'+t).classList.add('active');
+  if(t==='denniplan') renderDailyPlan();
+  if(t==='material') renderMaterials();
+  if(t==='fakturace') updateBillingFromData();
+}
+
+// ── MODALS ─────────────────────────────────────────────
+function closeModal(id) { document.getElementById(id).classList.remove('open'); if(id==='mod-modal') editingMod=null; }
+document.querySelectorAll('.modal-overlay').forEach(el=>el.addEventListener('click',function(e){ if(e.target===this) closeModal(this.id); }));
+document.addEventListener('keydown',e=>{ if(e.key==='Escape') document.querySelectorAll('.modal-overlay.open').forEach(m=>closeModal(m.id)); });
+
+// ── CLOCK & INIT ───────────────────────────────────────
+setInterval(()=>document.getElementById('clock').textContent=new Date().toLocaleTimeString('cs-CZ'),1000);
+document.getElementById('clock').textContent=new Date().toLocaleTimeString('cs-CZ');
+loadState(); renderMaterials();
+</script>
+</body>
+</html>
