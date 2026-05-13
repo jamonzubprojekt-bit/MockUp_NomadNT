@@ -558,8 +558,8 @@ textarea.form-control { resize: vertical; min-height: 70px; }
 // ── AUTH ────────────────────────────────────────────────
 // Credentials are verified client-side using SHA-256.
 // Hash = SHA-256("ntcom@example.com"), username checked case-sensitively.
-const CRED_HASH = 'c26a0f907eadb91a1a8b95953af05169ac8d48b772fbc8780a5157b2582f25d7';
-const CRED_USER = 'Admin';
+const CRED_HASH = '1433a95b77e8c1b38f6358663b21aac75e941d765e84e6e1bb4d30d451d4ea53';
+const CRED_USER = 'ntcom';
 const LOGIN_LOCKOUT_MS = 3000;
 
 let loginLocked = false;
@@ -936,7 +936,7 @@ function renderModSquares(rec) {
   SEQ.forEach(m=>{
     const st=getModState(rec.ropId,m), locked=isModLocked(rec,m);
     let cls=locked?'pending locked':(st.status!=='pending'?st.status:(st.date?'scheduled':'pending'));
-    h+=`<div class="mod-sq ${cls}" title="${MODULE_NAMES[m]}${st.date?'\n📅 '+st.date.slice(0,16).replace('T',' '):''" onclick="${locked?'':('openModModal(\''+rec.ropId+'\','+m+')')}">  ${m}</div>`;
+    h+=`<div class="mod-sq ${cls}" title="${MODULE_NAMES[m]}${st.date?'\n📅 '+st.date.slice(0,16).replace('T',' '):''}" onclick="${locked?'':('openModModal(\''+rec.ropId+'\','+m+')')}">  ${m}</div>`;
   });
   h+='<div class="mod-divider"></div>';
   indep.forEach(m=>{
@@ -1248,5 +1248,3 @@ setInterval(()=>document.getElementById('clock').textContent=new Date().toLocale
 document.getElementById('clock').textContent=new Date().toLocaleTimeString('cs-CZ');
 loadState().then(() => { renderMaterials(); loadCsvFromGitHub(); });
 </script>
-</body>
-</html>
