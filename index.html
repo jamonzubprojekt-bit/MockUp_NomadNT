@@ -301,6 +301,7 @@ textarea.form-control { resize: vertical; min-height: 70px; }
   <div class="project-badge">DUTEP11 · Dubí · CETIN</div>
   <div class="project-badge" id="record-count">0 záznamů</div>
   <div class="project-badge">Mockup v2.0</div>
+  <div class="project-badge" id="save-status" style="display:none">💾 Ukládám…</div>
   <div class="clock" id="clock">--:--:--</div>
   <button id="logout-btn" onclick="doLogout()">⎋ Odhlásit</button>
 </div>
@@ -643,31 +644,68 @@ let currentFilter = 'all', currentSearch = '', currentSort = 'none';
 let currentPlanDay = new Date().toISOString().slice(0,10);
 let editingMod = null;
 
+// ── GITHUB SYNC ────────────────────────────────────────
+const GH_TOKEN = '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';
+const GH_REPO  = 'jamonzubprojekt-bit/MockUp_NomadNT';
+const GH_API   = 'https://api.github.com/repos/' + GH_REPO + '/contents/';
+const GH_HDR   = { 'Authorization': 'Bearer ' + GH_TOKEN, 'Accept': 'application/vnd.github+json', 'Content-Type': 'application/json' };
+let stateSha = null, csvSha = null, saveTimer = null;
+
+// UTF-8 safe base64 encode/decode
+function b64enc(str) {
+  const bytes = new TextEncoder().encode(str);
+  let bin = ''; for(let i=0;i<bytes.length;i++) bin += String.fromCharCode(bytes[i]);
+  return btoa(bin);
+}
+function b64dec(str) {
+  const bin = atob(str.replace(/\n/g,''));
+  const bytes = new Uint8Array(bin.length);
+  for(let i=0;i<bin.length;i++) bytes[i] = bin.charCodeAt(i);
+  return new TextDecoder().decode(bytes);
+}
+
+function showSaveStatus(msg, color) {
+  const el = document.getElementById('save-status');
+  el.textContent = msg; el.style.color = color||'var(--orange)'; el.style.display = '';
+  if(color === 'var(--green)') setTimeout(()=>{ el.style.display='none'; }, 2500);
+}
+
 // ── STATE PERSISTENCE ──────────────────────────────────
-function loadState() {
-  try { const s = localStorage.getItem('nomadnt_mod_state'); if(s) moduleState = JSON.parse(s); } catch(e){}
+async function loadState() {
+  // Materials remain local
   try { const m = localStorage.getItem('nomadnt_materials'); if(m) materials = JSON.parse(m); } catch(e){}
-}
-function restoreCsvFromStorage() {
+  // Module states from GitHub
   try {
-    const csv = localStorage.getItem('nomadnt_csv_raw');
-    if(!csv) return;
-    const res = Papa.parse(csv, { skipEmptyLines:true });
-    records = res.data.slice(1).map((r,i) => parseRow(r,i)).filter(r => r.ropId);
-    if(records.length) {
-      document.getElementById('empty-state').style.display = 'none';
-      document.getElementById('table-wrap').style.display = 'block';
-      document.getElementById('record-count').textContent = records.length + ' záznamů';
-      populateDropdowns();
-      renderTable(); updateStats(); renderModLegend();
-      renderDailyPlan(); updateBillingFromData();
+    const r = await fetch(GH_API + 'state.json', { headers: GH_HDR });
+    if(r.ok) {
+      const d = await r.json();
+      stateSha = d.sha;
+      moduleState = JSON.parse(b64dec(d.content));
     }
-  } catch(e){}
+  } catch(e) {}
 }
+
 function saveState() {
-  localStorage.setItem('nomadnt_mod_state', JSON.stringify(moduleState));
   localStorage.setItem('nomadnt_materials', JSON.stringify(materials));
+  showSaveStatus('💾 Ukládám…');
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(async () => {
+    try {
+      const body = { message: 'update state', content: b64enc(JSON.stringify(moduleState)) };
+      if(stateSha) body.sha = stateSha;
+      const r = await fetch(GH_API + 'state.json', { method:'PUT', headers: GH_HDR, body: JSON.stringify(body) });
+      if(r.ok) {
+        const d = await r.json(); stateSha = d.content.sha;
+        showSaveStatus('✓ Uloženo', 'var(--green)');
+      } else if(r.status === 409) {
+        // Konflikt – jiný uživatel zapsal dříve, načteme nové SHA a zkusíme znovu
+        const r2 = await fetch(GH_API + 'state.json', { headers: GH_HDR });
+        if(r2.ok) { const d2 = await r2.json(); stateSha = d2.sha; saveState(); }
+      } else { showSaveStatus('⚠ Chyba uložení', 'var(--red)'); }
+    } catch(e) { showSaveStatus('⚠ Offline', 'var(--red)'); }
+  }, 800);
 }
+
 function clearAllState() {
   if(!confirm('Opravdu resetovat všechny stavy modulů?')) return;
   moduleState = {}; saveState(); renderTable(); updateStats(); renderModLegend();
@@ -682,21 +720,44 @@ function setModState(id, m, data) {
 }
 
 // ── CSV LOADING ────────────────────────────────────────
+async function loadCsvFromGitHub() {
+  try {
+    const r = await fetch(GH_API + 'data.csv', { headers: GH_HDR });
+    if(!r.ok) return; // Soubor data.csv ještě neexistuje – zobrazí se empty-state
+    const d = await r.json();
+    csvSha = d.sha;
+    processCsvText(b64dec(d.content));
+  } catch(e) {}
+}
+
+function processCsvText(rawText) {
+  Papa.parse(rawText, { skipEmptyLines:true, complete: function(res) {
+    records = res.data.slice(1).map((r,i) => parseRow(r,i)).filter(r => r.ropId);
+    if(!records.length) return;
+    document.getElementById('empty-state').style.display = 'none';
+    document.getElementById('table-wrap').style.display = 'block';
+    document.getElementById('record-count').textContent = records.length + ' záznamů';
+    populateDropdowns();
+    renderTable(); updateStats(); renderModLegend();
+    renderDailyPlan(); renderMaterials(); updateBillingFromData();
+  }, error: e => console.error('CSV parse error:', e.message) });
+}
+
+// Ruční nahrání CSV – soubor se zároveň uloží do GitHubu jako data.csv
 document.getElementById('csv-input').addEventListener('change', function(e) {
   const file = e.target.files[0]; if(!file) return;
   const reader = new FileReader();
-  reader.onload = function(ev) {
+  reader.onload = async function(ev) {
     const rawText = ev.target.result;
-    localStorage.setItem('nomadnt_csv_raw', rawText);
-    Papa.parse(rawText, { skipEmptyLines:true, complete: function(res) {
-      records = res.data.slice(1).map((r,i) => parseRow(r,i)).filter(r => r.ropId);
-      document.getElementById('empty-state').style.display = 'none';
-      document.getElementById('table-wrap').style.display = 'block';
-      document.getElementById('record-count').textContent = records.length + ' záznamů';
-      populateDropdowns();
-      renderTable(); updateStats(); renderModLegend();
-      renderDailyPlan(); renderMaterials(); updateBillingFromData();
-    }, error: e => alert('Chyba CSV: '+e.message) });
+    showSaveStatus('📂 Nahrávám CSV…');
+    try {
+      const body = { message: 'update data.csv', content: b64enc(rawText) };
+      if(csvSha) body.sha = csvSha;
+      const r = await fetch(GH_API + 'data.csv', { method:'PUT', headers: GH_HDR, body: JSON.stringify(body) });
+      if(r.ok) { const d = await r.json(); csvSha = d.content.sha; showSaveStatus('✓ CSV nahráno', 'var(--green)'); }
+      else { showSaveStatus('⚠ Chyba nahrání CSV', 'var(--red)'); }
+    } catch(e) { showSaveStatus('⚠ Offline', 'var(--red)'); }
+    processCsvText(rawText);
   };
   reader.readAsText(file, 'UTF-8');
 });
@@ -875,7 +936,7 @@ function renderModSquares(rec) {
   SEQ.forEach(m=>{
     const st=getModState(rec.ropId,m), locked=isModLocked(rec,m);
     let cls=locked?'pending locked':(st.status!=='pending'?st.status:(st.date?'scheduled':'pending'));
-    h+=`<div class="mod-sq ${cls}" title="${MODULE_NAMES[m]}${st.date?'\n📅 '+st.date.slice(0,16).replace('T',' '):''}" onclick="${locked?'':('openModModal(\''+rec.ropId+'\','+m+')')}">  ${m}</div>`;
+    h+=`<div class="mod-sq ${cls}" title="${MODULE_NAMES[m]}${st.date?'\n📅 '+st.date.slice(0,16).replace('T',' '):''" onclick="${locked?'':('openModModal(\''+rec.ropId+'\','+m+')')}">  ${m}</div>`;
   });
   h+='<div class="mod-divider"></div>';
   indep.forEach(m=>{
@@ -1185,7 +1246,7 @@ document.addEventListener('keydown',e=>{ if(e.key==='Escape') document.querySele
 // ── CLOCK & INIT ───────────────────────────────────────
 setInterval(()=>document.getElementById('clock').textContent=new Date().toLocaleTimeString('cs-CZ'),1000);
 document.getElementById('clock').textContent=new Date().toLocaleTimeString('cs-CZ');
-loadState(); renderMaterials(); restoreCsvFromStorage();
+loadState().then(() => { renderMaterials(); loadCsvFromGitHub(); });
 </script>
 </body>
 </html>
