@@ -486,6 +486,7 @@ textarea.form-control { resize: vertical; min-height: 70px; }
     <div class="modal-body">
       <div class="mod-detail-header" id="mod-detail-header"></div>
       <div class="info-grid" id="mod-info-grid"></div>
+      <div id="mod-extra-fields"></div>
       <div class="form-group">
         <label>Naplánovat termín</label>
         <div style="display:flex;gap:8px">
@@ -1009,6 +1010,87 @@ function updateStats() {
 }
 
 // ── MODULE MODAL ───────────────────────────────────────
+function renderModExtraFields(modNum, rec, extra, locked) {
+  const dis = locked ? ' disabled' : '';
+  const v = (k, def) => { const x = extra[k]; return (x !== undefined && x !== null) ? x : (def !== undefined ? def : ''); };
+  const sel = (id, opts, cur) => `<select class="form-control" id="mex-${id}"${dis}>${opts.map(o=>`<option value="${o}"${cur===o?' selected':''}>${o}</option>`).join('')}</select>`;
+  const wrap = (label, inner) => `<div class="form-group" style="margin-bottom:10px"><label>${label}</label>${inner}</div>`;
+  const grid2 = (a, b) => `<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:10px">${a}${b}</div>`;
+  const num = (id, label, ph) => `<div><label style="display:block;font-size:11px;color:var(--text-muted);margin-bottom:6px;font-weight:600;text-transform:uppercase;letter-spacing:.5px">${label}</label><input type="number" class="form-control" id="mex-${id}" value="${v(id)}" placeholder="${ph}"${dis}></div>`;
+  const txt = (id, label, ph) => `<div><label style="display:block;font-size:11px;color:var(--text-muted);margin-bottom:6px;font-weight:600;text-transform:uppercase;letter-spacing:.5px">${label}</label><input type="text" class="form-control" id="mex-${id}" value="${v(id)}" placeholder="${ph}"${dis}></div>`;
+  const secdiv = (icon, title, body) => `<div style="border-top:1px solid var(--border);padding-top:14px;margin-bottom:14px"><div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">${icon} ${title}</div>${body}</div>`;
+  const chk = (id, label) => `<div style="display:flex;align-items:center;gap:8px;margin-top:4px"><input type="checkbox" id="mex-${id}" ${v(id)?'checked':''} ${locked?'disabled':''} style="width:16px;height:16px;cursor:pointer"><label for="mex-${id}" style="font-size:13px;color:var(--text);cursor:pointer;font-weight:500;text-transform:none;letter-spacing:0">${label}</label></div>`;
+
+  let h = '';
+
+  if (modNum === 1) {
+    h = secdiv('⛏','Parametry výkopu',
+      grid2(num('delka','Délka výkopu (m)','0'), num('hloubka','Hloubka (cm)','60')) +
+      wrap('Typ zeminy', sel('zemina',['Zemina','Asfalt','Beton','Dlažba','Smíšený'], v('zemina','Zemina'))));
+
+  } else if (modNum === 2) {
+    h = secdiv('🗺','Parametry Matrix',
+      grid2(txt('segment','Segment ID','SEG-001'), txt('splitter_loc','Splitter lokace','BOX-A')) +
+      wrap('Σ Unikátních bodů', `<input type="number" class="form-control" id="mex-unique" value="${v('unique')}" placeholder="0"${dis}>`));
+
+  } else if (modNum === 3) {
+    h = secdiv('🔩','Parametry MT pokládky',
+      grid2(num('delka','Délka pokládky (m)','0'), num('pocet','Počet trubiček','1')) +
+      wrap('Typ mikrotrubičky', sel('typ',['Ø7mm','Ø10mm','Ø14mm','Ø20mm'], v('typ','Ø7mm'))));
+
+  } else if (modNum === 4) {
+    h = secdiv('🔄','Parametry vrtání',
+      wrap('Metoda vrtání', sel('metoda',['Horizontální vrt','Propich','Řízené vrtání','Kombinace'], v('metoda','Horizontální vrt'))) +
+      grid2(num('delka','Délka vrtu (m)','0'), num('prumer','Průměr (mm)','40')));
+
+  } else if (modNum === 5) {
+    h = secdiv('💨','Parametry záfuku',
+      wrap('Typ kabelu', sel('kabel',['SM 9/125 μm','MM 50/125 μm','MM 62.5/125 μm','OM3','OM4'], v('kabel','SM 9/125 μm'))) +
+      grid2(num('delka','Délka záfuku (m)','0'),
+        `<div>${wrap('Výsledek', sel('vysledek',['OK','Přerušení','Technický problém','Čeká na opakování'], v('vysledek','OK')))}</div>`));
+
+  } else if (modNum === 6) {
+    h = secdiv('🏗','Parametry záhozu',
+      wrap('Druh zhutňování', sel('zhutneni',['Ruční pěchování','Vibrační deska','Kombinace','Bez zhutňování'], v('zhutneni','Ruční pěchování'))) +
+      grid2(num('delka','Délka záhozu (m)','0'),
+        `<div>${wrap('Stav terénu', sel('teren',['Zemina','Asfalt','Beton','Dlažba','Travní porost'], v('teren','Zemina')))}</div>`));
+
+  } else if (modNum === 7) {
+    h = secdiv('🔥','Parametry svárů',
+      wrap('Typ spliteru', sel('spliter',['SHARP','HUAWEI','CORNING','NEUTRIK','FIBRAIN','SIEVERT'], v('spliter','SHARP'))) +
+      grid2(
+        `<div>${wrap('Vstup — typ vlákna', sel('vstup',['SM 9/125 μm','MM 50/125 μm','MM 62.5/125 μm'], v('vstup','SM 9/125 μm')))}</div>`,
+        `<div>${wrap('Výstup — typ vlákna', sel('vystup',['SM 9/125 μm','MM 50/125 μm','MM 62.5/125 μm'], v('vystup','SM 9/125 μm')))}</div>`) +
+      grid2(num('svaru','Počet svárů','0'), txt('box','Označení boxu','BOX-01')) +
+      chk('pp','PP podepsán zákazníkem'));
+
+  } else if (modNum === 8) {
+    const realiz = v('realizace','Výkop');
+    h = secdiv('🏢','Parametry VR Construction',
+      `<div class="form-group" style="margin-bottom:10px"><label>Způsob realizace</label><div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:6px">${['Výkop','Mikrovýkop','Vrtání','Záfuk'].map(o=>`<label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:12px;color:var(--text);font-weight:normal;text-transform:none;letter-spacing:0"><input type="radio" name="mex-realizace" value="${o}" ${realiz===o?'checked':''} ${locked?'disabled':''}> ${o}</label>`).join('')}</div></div>` +
+      grid2(num('hp','Počet HP', rec.pocetHp||0),
+        `<div>${wrap('Typ skříně', sel('skrinja',['Optická skříň','WKS','Rozvaděč','Venkovní box','Jiné'], v('skrinja','Optická skříň')))}</div>`) +
+      chk('komise','Komisní dokumentace předána'));
+  }
+
+  document.getElementById('mod-extra-fields').innerHTML = h;
+}
+
+function collectModExtra(modNum) {
+  const g = id => { const el = document.getElementById('mex-'+id); return el ? el.value : undefined; };
+  const gc = id => { const el = document.getElementById('mex-'+id); return el ? el.checked : undefined; };
+  const gr = name => { const el = document.querySelector(`input[name="${name}"]:checked`); return el ? el.value : undefined; };
+  if (modNum === 1) return {delka:g('delka'),hloubka:g('hloubka'),zemina:g('zemina')};
+  if (modNum === 2) return {segment:g('segment'),splitter_loc:g('splitter_loc'),unique:g('unique')};
+  if (modNum === 3) return {delka:g('delka'),pocet:g('pocet'),typ:g('typ')};
+  if (modNum === 4) return {metoda:g('metoda'),delka:g('delka'),prumer:g('prumer')};
+  if (modNum === 5) return {kabel:g('kabel'),delka:g('delka'),vysledek:g('vysledek')};
+  if (modNum === 6) return {zhutneni:g('zhutneni'),delka:g('delka'),teren:g('teren')};
+  if (modNum === 7) return {spliter:g('spliter'),vstup:g('vstup'),vystup:g('vystup'),svaru:g('svaru'),box:g('box'),pp:gc('pp')};
+  if (modNum === 8) return {realizace:gr('mex-realizace'),hp:g('hp'),skrinja:g('skrinja'),komise:gc('komise')};
+  return {};
+}
+
 function openModModal(ropId, modNum) {
   const rec=records.find(r=>r.ropId===ropId); if(!rec) return;
   editingMod={ropId,modNum};
@@ -1025,6 +1107,7 @@ function openModModal(ropId, modNum) {
     <div class="info-item"><div class="lbl">Kontakt</div><div class="val">${rec.kontaktOsoba||'—'}<br><span style="color:var(--text-muted);font-size:11px">${rec.kontaktTel||''}</span></div></div>
     <div class="info-item"><div class="lbl">Aktuální stav</div><div class="val"><span class="badge badge-${st.status==='hotovo'?'green':st.status==='vada'?'red':st.date?'orange':'gray'}">${st.status.toUpperCase()}</span></div></div>
     <div class="info-item"><div class="lbl">Termín / Odpočet</div><div class="val">${st.date?st.date.slice(0,16).replace('T',' '):'—'}${cd?`<br><span class="${cd.cls}">⏱ ${cd.text}</span>`:''}</div></div>`;
+  renderModExtraFields(modNum, rec, st.extra||{}, locked);
   const [datePart, timePart] = (st.date||'').split('T');
   document.getElementById('mod-date').value=datePart||'';
   document.getElementById('mod-time').value=timePart||'';
@@ -1049,7 +1132,7 @@ function saveModStatus() {
   const {ropId,modNum}=editingMod;
   const d=document.getElementById('mod-date').value, t=document.getElementById('mod-time').value;
   const datetime = d ? (t ? d+'T'+t : d+'T00:00') : '';
-  setModState(ropId,modNum,{date:datetime, note:document.getElementById('mod-note').value});
+  setModState(ropId,modNum,{date:datetime, note:document.getElementById('mod-note').value, extra:collectModExtra(modNum)});
   renderTable(); updateStats(); renderModLegend(); renderDailyPlan(); updateBillingFromData(); closeModal('mod-modal');
 }
 
@@ -1149,7 +1232,10 @@ function renderDailyPlan() {
         <div style="font-size:22px;font-weight:700;color:var(--orange)">${time}</div>
         <div style="font-size:11px;color:var(--text-muted)">Čas</div>
       </div>
-      <button class="btn success" onclick="quickComplete('${rec.ropId}',${modNum})">✓ Hotovo</button>
+      <div style="display:flex;flex-direction:column;gap:6px;flex-shrink:0">
+        <button class="btn success" style="white-space:nowrap" onclick="quickComplete('${rec.ropId}',${modNum})">✓ Hotovo</button>
+        <button class="btn" style="white-space:nowrap;font-size:11px" onclick="openModModal('${rec.ropId}',${modNum})">🔎 Detail</button>
+      </div>
     </div>`;
   });
   document.getElementById('daily-list').innerHTML=h;
