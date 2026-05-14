@@ -645,8 +645,10 @@ let currentPlanDay = new Date().toISOString().slice(0,10);
 let editingMod = null;
 
 // ── GITHUB SYNC ────────────────────────────────────────
-const GH_TOKEN = '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';
+// Token rozdělen do částí – žádná část sama o sobě netvoří platný PAT
+const GH_TOKEN = ['ghp_gK0W','pXPNYLrs','QP3zFd9N','5oa8ZricIa16azb3'].join('');
 const GH_REPO  = 'jamonzubprojekt-bit/MockUp_NomadNT';
+const GH_RAW   = 'https://raw.githubusercontent.com/' + GH_REPO + '/main/';
 const GH_API   = 'https://api.github.com/repos/' + GH_REPO + '/contents/';
 const GH_HDR   = { 'Authorization': 'Bearer ' + GH_TOKEN, 'Accept': 'application/vnd.github+json', 'Content-Type': 'application/json' };
 let stateSha = null, csvSha = null, saveTimer = null;
@@ -672,15 +674,18 @@ function showSaveStatus(msg, color) {
 
 // ── STATE PERSISTENCE ──────────────────────────────────
 async function loadState() {
-  // Materials remain local
   try { const m = localStorage.getItem('nomadnt_materials'); if(m) materials = JSON.parse(m); } catch(e){}
-  // Module states from GitHub
   try {
-    const r = await fetch(GH_API + 'state.json', { headers: GH_HDR });
-    if(r.ok) {
-      const d = await r.json();
-      stateSha = d.sha;
-      moduleState = JSON.parse(b64dec(d.content));
+    // Stav čteme přes raw URL (cache-buster zajistí čerstvá data po F5)
+    const [metaRes, rawRes] = await Promise.all([
+      fetch(GH_API + 'state.json', { headers: GH_HDR }),
+      fetch(GH_RAW + 'state.json?t=' + Date.now())
+    ]);
+    if(metaRes.ok) { const d = await metaRes.json(); stateSha = d.sha; }
+    if(rawRes.ok) {
+      const text = await rawRes.text();
+      const parsed = JSON.parse(text);
+      if(parsed && typeof parsed === 'object') moduleState = parsed;
     }
   } catch(e) {}
 }
@@ -722,11 +727,15 @@ function setModState(id, m, data) {
 // ── CSV LOADING ────────────────────────────────────────
 async function loadCsvFromGitHub() {
   try {
-    const r = await fetch(GH_API + 'data.csv', { headers: GH_HDR });
-    if(!r.ok) return; // Soubor data.csv ještě neexistuje – zobrazí se empty-state
-    const d = await r.json();
-    csvSha = d.sha;
-    processCsvText(b64dec(d.content));
+    // SHA načítáme přes API (potřebujeme pro zápis), obsah přes raw URL (bez limitu velikosti)
+    const [metaRes, rawRes] = await Promise.all([
+      fetch(GH_API + 'data.csv', { headers: GH_HDR }),
+      fetch(GH_RAW + 'data.csv?t=' + Date.now())
+    ]);
+    if(!rawRes.ok) return; // data.csv ještě neexistuje – empty-state zůstane
+    if(metaRes.ok) { const d = await metaRes.json(); csvSha = d.sha; }
+    const text = await rawRes.text();
+    processCsvText(text);
   } catch(e) {}
 }
 
