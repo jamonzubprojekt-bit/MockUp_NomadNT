@@ -676,15 +676,13 @@ function showSaveStatus(msg, color) {
 async function loadState() {
   try { const m = localStorage.getItem('nomadnt_materials'); if(m) materials = JSON.parse(m); } catch(e){}
   try {
-    // Stav čteme přes raw URL (cache-buster zajistí čerstvá data po F5)
-    const [metaRes, rawRes] = await Promise.all([
-      fetch(GH_API + 'state.json', { headers: GH_HDR }),
-      fetch(GH_RAW + 'state.json?t=' + Date.now())
-    ]);
-    if(metaRes.ok) { const d = await metaRes.json(); stateSha = d.sha; }
-    if(rawRes.ok) {
-      const text = await rawRes.text();
-      const parsed = JSON.parse(text);
+    // Čteme přes GitHub API – vždy aktuální data, žádná CDN cache
+    // (raw.githubusercontent.com má CDN cache delay a ignoruje cache-buster)
+    const r = await fetch(GH_API + 'state.json', { headers: GH_HDR, cache: 'no-store' });
+    if(r.ok) {
+      const d = await r.json();
+      stateSha = d.sha;
+      const parsed = JSON.parse(b64dec(d.content));
       if(parsed && typeof parsed === 'object') moduleState = parsed;
     }
   } catch(e) {}
