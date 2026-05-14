@@ -268,6 +268,42 @@ textarea.form-control { resize: vertical; min-height: 70px; }
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: var(--bg); }
 ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+/* MOBILE HEADER */
+#mobile-header {
+  display: none; flex-shrink: 0;
+  align-items: center; justify-content: space-between;
+  padding: 10px 14px;
+  background: var(--surface); border-bottom: 2px solid var(--blue);
+}
+
+/* CALENDAR DETAIL BUTTON */
+.cal-detail-btn {
+  flex-shrink: 0; width: 30%; min-width: 90px; max-width: 150px;
+  padding: 14px 8px; font-size: 14px; font-weight: 700;
+  border-radius: var(--radius); border: 2px solid var(--blue-light);
+  background: rgba(31,111,235,0.08); color: var(--blue-light);
+  cursor: pointer; text-align: center; transition: all 0.15s; white-space: nowrap;
+}
+.cal-detail-btn:hover, .cal-detail-btn:active { background: var(--blue-light); color: #fff; }
+
+/* MOBILE / WORKER MODE — skrýt vše nepotřebné */
+@media (max-width: 768px) {
+  #topbar { display: none !important; }
+  #statsbar { display: none !important; }
+  #modlegend { display: none !important; }
+  #controls { display: none !important; }
+  #filterbar { display: none !important; }
+  #tabs { display: none !important; }
+  #mobile-header { display: flex !important; }
+}
+body.worker-mode #topbar { display: none !important; }
+body.worker-mode #statsbar { display: none !important; }
+body.worker-mode #modlegend { display: none !important; }
+body.worker-mode #controls { display: none !important; }
+body.worker-mode #filterbar { display: none !important; }
+body.worker-mode #tabs { display: none !important; }
+body.worker-mode #mobile-header { display: flex !important; }
 </style>
 </head>
 <body>
@@ -292,6 +328,19 @@ textarea.form-control { resize: vertical; min-height: 70px; }
     <button id="login-btn" onclick="doLogin()">Přihlásit se</button>
     <div id="login-countdown"></div>
     <div class="login-footer">NomadNT Mockup v2.0 · Interní demo · CETIN DUTEP11</div>
+  </div>
+</div>
+
+<!-- MOBILE / WORKER HEADER -->
+<div id="mobile-header">
+  <div style="display:flex;align-items:center;gap:10px">
+    <span style="font-size:16px;font-weight:700;color:var(--blue-light)">⬡ NomadNT</span>
+    <span id="mobile-today-badge" style="background:var(--orange);color:#fff;border-radius:12px;padding:2px 10px;font-size:11px;font-weight:700">● 0 dnes</span>
+  </div>
+  <div style="display:flex;align-items:center;gap:8px">
+    <span id="mobile-clock" style="font-size:12px;color:var(--text-muted);font-variant-numeric:tabular-nums"></span>
+    <button class="btn" onclick="openInfoModal()" style="padding:5px 12px;font-size:12px;border-color:var(--blue-light);color:var(--blue-light)">ℹ Info</button>
+    <button onclick="doLogout()" style="padding:4px 10px;border-radius:var(--radius);border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;font-size:11px">⎋</button>
   </div>
 </div>
 
@@ -531,6 +580,20 @@ textarea.form-control { resize: vertical; min-height: 70px; }
   </div>
 </div>
 
+<!-- MODAL: INFO (MOBILNÍ PŘEHLED) -->
+<div class="modal-overlay" id="info-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>📊 Stav modulů</h3>
+      <button class="modal-close" onclick="closeModal('info-modal')">×</button>
+    </div>
+    <div class="modal-body" id="info-modal-body" style="padding:12px 20px"></div>
+    <div class="modal-footer">
+      <button class="btn active" onclick="closeModal('info-modal')">Zavřít</button>
+    </div>
+  </div>
+</div>
+
 <!-- MODAL: MATERIÁL -->
 <div class="modal-overlay" id="mat-modal">
   <div class="modal">
@@ -564,6 +627,7 @@ textarea.form-control { resize: vertical; min-height: 70px; }
 // Hash = SHA-256("ntcom@example.com"), username checked case-sensitively.
 const CRED_HASH = '1433a95b77e8c1b38f6358663b21aac75e941d765e84e6e1bb4d30d451d4ea53';
 const CRED_USER = 'ntcom';
+const CRED_USER_WORKER = 'delnik';
 const LOGIN_LOCKOUT_MS = 3000;
 
 let loginLocked = false;
@@ -579,10 +643,12 @@ async function doLogin() {
   const user = document.getElementById('login-user').value.trim();
   const pass = document.getElementById('login-pass').value;
   const hash = await sha256(pass);
-  if (user === CRED_USER && hash === CRED_HASH) {
+  if ((user === CRED_USER || user === CRED_USER_WORKER) && hash === CRED_HASH) {
     sessionStorage.setItem('nomadnt_auth', '1');
+    sessionStorage.setItem('nomadnt_role', user === CRED_USER_WORKER ? 'worker' : 'admin');
     document.getElementById('login-screen').classList.add('hidden');
     document.getElementById('login-error').classList.remove('visible');
+    if (user === CRED_USER_WORKER) applyWorkerMode();
   } else {
     showLoginError();
   }
@@ -635,6 +701,7 @@ document.addEventListener('keydown', e => {
 (function() {
   if (sessionStorage.getItem('nomadnt_auth') === '1') {
     document.getElementById('login-screen').classList.add('hidden');
+    if (sessionStorage.getItem('nomadnt_role') === 'worker') applyWorkerMode();
   }
 })();
 
@@ -1006,7 +1073,58 @@ function updateStats() {
   document.getElementById('s-mso').textContent=records.filter(r=>r.vrType==='MSO').length;
   document.getElementById('s-vso').textContent=records.filter(r=>r.vrType==='VSO').length;
   document.getElementById('s-done').textContent=records.filter(r=>moduleState[r.ropId]?._rzsv==='ano').length;
-  document.getElementById('s-today').textContent=records.filter(r=>Object.values(moduleState[r.ropId]||{}).some(m=>m.date&&m.date.startsWith(today))).length;
+  const todayCnt=records.filter(r=>Object.values(moduleState[r.ropId]||{}).some(m=>m.date&&m.date.startsWith(today))).length;
+  document.getElementById('s-today').textContent=todayCnt;
+  const mb=document.getElementById('mobile-today-badge');
+  if(mb) mb.textContent='● '+todayCnt+' dnes';
+}
+
+// ── WORKER MODE & INFO MODAL ───────────────────────────
+function applyWorkerMode() {
+  document.body.classList.add('worker-mode');
+  switchTab('denniplan');
+}
+
+function openInfoModal() {
+  const icons={1:'⛏',2:'🗺',3:'🔩',4:'🔄',5:'💨',6:'🏗',7:'🔥',8:'🏢'};
+  const names={1:'Výkop',2:'Matrix',3:'MT pokl.',4:'Vrtání',5:'Záfuk',6:'Zához',7:'Sváry',8:'VR Const.'};
+  const counts={};
+  for(let m=1;m<=8;m++) counts[m]={pending:0,sched:0,vada:0,hotovo:0};
+  records.forEach(rec=>{
+    const mods=[1,2,3,4,5,6,7]; if(rec.vrType==='VSO') mods.push(8);
+    mods.forEach(m=>{
+      const st=getModState(rec.ropId,m);
+      if(st.status==='hotovo') counts[m].hotovo++;
+      else if(st.status==='vada') counts[m].vada++;
+      else if(st.date) counts[m].sched++;
+      else counts[m].pending++;
+    });
+  });
+  const legend = `<div style="font-size:10px;display:flex;gap:16px;padding:8px 0 12px 0;color:var(--text-muted);border-bottom:1px solid var(--border);margin-bottom:4px">
+    <span>⬜ Čeká</span><span style="color:var(--orange)">🟠 Naplánováno</span><span style="color:var(--red)">🔴 Vada</span><span style="color:var(--green)">🟢 Hotovo</span>
+  </div>`;
+  let h = legend;
+  for(let m=1;m<=8;m++){
+    const c=counts[m];
+    h+=`<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border)">
+      <div style="display:flex;align-items:center;gap:10px">
+        <span style="font-size:20px">${icons[m]}</span>
+        <span style="font-weight:600;font-size:13px">${names[m]}</span>
+      </div>
+      <div style="display:flex;gap:10px;font-size:13px;font-variant-numeric:tabular-nums">
+        <span style="color:var(--text-muted);min-width:24px;text-align:right">${c.pending}</span>
+        <span style="color:var(--border)">·</span>
+        <span style="color:var(--orange);min-width:24px;text-align:right">${c.sched}</span>
+        <span style="color:var(--border)">·</span>
+        <span style="color:var(--red);min-width:24px;text-align:right">${c.vada}</span>
+        <span style="color:var(--border)">·</span>
+        <span style="color:var(--green);min-width:24px;text-align:right">${c.hotovo}</span>
+      </div>
+    </div>`;
+  }
+  if(!records.length) h='<p style="color:var(--text-muted);text-align:center;padding:20px 0">Načtěte CSV data pro zobrazení statistik.</p>';
+  document.getElementById('info-modal-body').innerHTML=h;
+  document.getElementById('info-modal').classList.add('open');
 }
 
 // ── MODULE MODAL ───────────────────────────────────────
@@ -1232,10 +1350,7 @@ function renderDailyPlan() {
         <div style="font-size:22px;font-weight:700;color:var(--orange)">${time}</div>
         <div style="font-size:11px;color:var(--text-muted)">Čas</div>
       </div>
-      <div style="display:flex;flex-direction:column;gap:6px;flex-shrink:0">
-        <button class="btn success" style="white-space:nowrap" onclick="quickComplete('${rec.ropId}',${modNum})">✓ Hotovo</button>
-        <button class="btn" style="white-space:nowrap;font-size:11px" onclick="openModModal('${rec.ropId}',${modNum})">🔎 Detail</button>
-      </div>
+      <button class="cal-detail-btn" onclick="openModModal('${rec.ropId}',${modNum})">🔎 Detail</button>
     </div>`;
   });
   document.getElementById('daily-list').innerHTML=h;
@@ -1345,8 +1460,14 @@ document.querySelectorAll('.modal-overlay').forEach(el=>el.addEventListener('cli
 document.addEventListener('keydown',e=>{ if(e.key==='Escape') document.querySelectorAll('.modal-overlay.open').forEach(m=>closeModal(m.id)); });
 
 // ── CLOCK & INIT ───────────────────────────────────────
-setInterval(()=>document.getElementById('clock').textContent=new Date().toLocaleTimeString('cs-CZ'),1000);
-document.getElementById('clock').textContent=new Date().toLocaleTimeString('cs-CZ');
+setInterval(()=>{
+  const t=new Date().toLocaleTimeString('cs-CZ');
+  document.getElementById('clock').textContent=t;
+  const mc=document.getElementById('mobile-clock'); if(mc) mc.textContent=t;
+},1000);
+const _t0=new Date().toLocaleTimeString('cs-CZ');
+document.getElementById('clock').textContent=_t0;
+const _mc0=document.getElementById('mobile-clock'); if(_mc0) _mc0.textContent=_t0;
 loadState().then(() => { renderMaterials(); loadCsvFromGitHub(); });
 </script>
 </body>
