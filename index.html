@@ -488,7 +488,10 @@ textarea.form-control { resize: vertical; min-height: 70px; }
       <div class="info-grid" id="mod-info-grid"></div>
       <div class="form-group">
         <label>Naplánovat termín</label>
-        <input type="datetime-local" class="form-control" id="mod-datetime">
+        <div style="display:flex;gap:8px">
+          <input type="date" class="form-control" id="mod-date" style="flex:2">
+          <input type="time" class="form-control" id="mod-time" style="flex:1">
+        </div>
       </div>
       <div class="form-group">
         <label>Poznámka</label>
@@ -1022,10 +1025,13 @@ function openModModal(ropId, modNum) {
     <div class="info-item"><div class="lbl">Kontakt</div><div class="val">${rec.kontaktOsoba||'—'}<br><span style="color:var(--text-muted);font-size:11px">${rec.kontaktTel||''}</span></div></div>
     <div class="info-item"><div class="lbl">Aktuální stav</div><div class="val"><span class="badge badge-${st.status==='hotovo'?'green':st.status==='vada'?'red':st.date?'orange':'gray'}">${st.status.toUpperCase()}</span></div></div>
     <div class="info-item"><div class="lbl">Termín / Odpočet</div><div class="val">${st.date?st.date.slice(0,16).replace('T',' '):'—'}${cd?`<br><span class="${cd.cls}">⏱ ${cd.text}</span>`:''}</div></div>`;
-  document.getElementById('mod-datetime').value=st.date||'';
+  const [datePart, timePart] = (st.date||'').split('T');
+  document.getElementById('mod-date').value=datePart||'';
+  document.getElementById('mod-time').value=timePart||'';
   document.getElementById('mod-note').value=st.note||'';
   document.getElementById('seq-warning').style.display=locked?'block':'none';
-  document.getElementById('mod-datetime').disabled=locked;
+  document.getElementById('mod-date').disabled=locked;
+  document.getElementById('mod-time').disabled=locked;
   document.getElementById('mod-note').disabled=locked;
   document.querySelectorAll('.status-btn').forEach(b=>b.disabled=locked);
   document.getElementById('mod-modal').classList.add('open');
@@ -1041,7 +1047,9 @@ function setModStatus(status) {
 function saveModStatus() {
   if(!editingMod) return;
   const {ropId,modNum}=editingMod;
-  setModState(ropId,modNum,{date:document.getElementById('mod-datetime').value, note:document.getElementById('mod-note').value});
+  const d=document.getElementById('mod-date').value, t=document.getElementById('mod-time').value;
+  const datetime = d ? (t ? d+'T'+t : d+'T00:00') : '';
+  setModState(ropId,modNum,{date:datetime, note:document.getElementById('mod-note').value});
   renderTable(); updateStats(); renderModLegend(); renderDailyPlan(); updateBillingFromData(); closeModal('mod-modal');
 }
 
